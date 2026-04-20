@@ -1,6 +1,0 @@
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/intrinsics_gen.dir
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/omp_gen.dir
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/acc_gen.dir
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/WeightedInstFreq.dir
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/edit_cache.dir
-/home/vboxuser/weighted-inst-freq/build/CMakeFiles/rebuild_cache.dir

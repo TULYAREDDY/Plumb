@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -shared  -o libWeightedInstFreq.so CMakeFiles/WeightedInstFreq.dir/WeightedInstFreq.cpp.o  -lLLVM-14 
