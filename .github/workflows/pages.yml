@@ -1,0 +1,65 @@
+name: Deploy dashboard to GitHub Pages
+
+# Publishes dashboard/dashboard.html as a static site on every push to main.
+# The dashboard is a single self-contained HTML file with CDN-loaded JS libs,
+# so there's nothing to build — we just stage the files and ship them.
+#
+# One-time setup required in the repo:
+#   Settings → Pages → Source: "GitHub Actions"
+# After that, every push to main redeploys automatically.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# GitHub Pages permissions
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping queued ones in between.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage site
+        run: |
+          set -eu
+          mkdir -p _site
+          # The dashboard is the entry point; serve it as the index.
+          cp dashboard/dashboard.html _site/index.html
+          # Ship the screenshots folder too (linked from README, useful in demo).
+          if [ -d docs ]; then
+            cp -r docs _site/docs
+          fi
+          # Add a tiny robots.txt so search engines don't index the demo dashboard.
+          printf "User-agent: *\nDisallow: /\n" > _site/robots.txt
+          echo "Site staged:"; ls -la _site
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
