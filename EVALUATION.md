@@ -245,6 +245,13 @@ it clear that the cost moved between functions rather than appeared
 out of nowhere. Aggregated across both `main` and the inlined callees,
 total module cost still drops O0 → O2.
 
+**At scale.** When we ran Plumb across 83 programs of LLVM's official
+test-suite (see [`benchmarks/SUMMARY.md`](benchmarks/SUMMARY.md)),
+this failure mode showed up in **3 of 83 programs (~4%)**. The biggest
+in-the-wild offender was `Shootout/matrix.c` at +112%. So the issue
+is real, but the *rate* is low — Plumb's per-function ranking remains
+informative on the other 96% of programs.
+
 ### 5.2 The `VECTORIZABLE` tag is over-permissive
 
 `parse_int @ O0` is tagged `VECTORIZABLE`. It isn't, in any practical

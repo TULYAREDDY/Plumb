@@ -30,6 +30,8 @@ A naive instruction count ranks two functions equal if they have the same number
 Every cost number traces back to `(group, count, weight, depth)` — no black-box scores.
 
 > **Real example.** On the `matmul()` from `testcases/test_floatmm.c`, raw instruction count says 78. Plumb at default weights says 335 — and pinpoints `bb.6` (the depth-3 inner accumulator) as the hot block carrying ~45% of total cost. After `-O2`, that drops to 81 (−76%), with the hotspot moving cleanly out of the inner body. [See §3.4 in EVALUATION.md](EVALUATION.md#34-test_floatmmc--depth-multiplier-in-action)
+>
+> **Validated at scale.** Across 83 programs from LLVM's official test-suite (1,165 functions, 166 runs), Plumb's median -O2 cost reduction is 56%, and its top hot function lines up with the canonical kernel name (Jacobi, FFT, `kernel_*`) on every numerical workload. [Full sweep in benchmarks/SUMMARY.md](benchmarks/SUMMARY.md)
 
 ---
 
@@ -40,6 +42,7 @@ Every cost number traces back to `(group, count, weight, depth)` — no black-bo
 - [Cost model in 30 seconds](#cost-model-in-30-seconds)
 - [Quick start](#quick-start)
 - [Testcase suite](#testcase-suite)
+- [Plumb on real code](#plumb-on-real-code)
 - [The dashboard](#the-dashboard)
 - [Output formats](#output-formats)
 - [Pass options](#pass-options)
@@ -210,6 +213,39 @@ The depth-3 inner loop (bb.5 → bb.6 → bb.7) carries the cost. `bb.6` alone i
 <div align="center">
   <img src="docs/diagrams/matmul-cfg.png" alt="Control-flow graph of matmul highlighting the depth-3 hottest block bb.6 and the critical path through bb.0 to bb.7" width="900" />
 </div>
+
+---
+
+## Plumb on real code
+
+The six testcases in [`testcases/`](testcases/) are designed to stress specific cost classes. To validate Plumb against actual workloads, [`benchmarks/`](benchmarks/) sweeps the official [LLVM test-suite](https://github.com/llvm/llvm-test-suite) `SingleSource/Benchmarks` subset (Stanford, Misc, Polybench, Shootout).
+
+```
+   ┌────────────────────────────────────────────────────────────┐
+   │   83 programs · 1,165 functions · 166 runs (O0 + O2)       │
+   │                                                            │
+   │   Median cost reduction at -O2     ─→   56 %               │
+   │   Programs whose hottest fn          memory-dominated 99 % │
+   │   Inliner-inflation failure mode    ─→   4 % of programs   │
+   │                                                            │
+   │   Top-3 hottest at -O0:                                    │
+   │     1.  Misc/himenobmtxpa  →  jacobi          (cost 10669) │
+   │     2.  Misc/oourafft       →  cftmdl          (cost  3176) │
+   │     3.  Polybench/deriche  →  kernel_deriche  (cost  1577) │
+   └────────────────────────────────────────────────────────────┘
+```
+
+Plumb's hot-function detection lines up with what an HPC engineer would call out as the kernel:
+Jacobi solvers, FFT inner loops, Polybench's `kernel_*` functions all surface at the top of the cost ranking. The full report — top-15 hottest programs, per-suite breakdown, and the 3 programs where -O2 actually *increased* reported cost (the failure mode from [EVALUATION.md §5.1](EVALUATION.md#5-failure-cases) confirmed in the wild) — lives in [**benchmarks/SUMMARY.md**](benchmarks/SUMMARY.md).
+
+To reproduce:
+
+```bash
+./build.sh
+./benchmarks/fetch.sh            # one-time sparse-clone of test-suite
+./benchmarks/run_bench.sh        # ~20 s end-to-end on Apple Silicon
+python3 benchmarks/analyze.py    # regenerates SUMMARY.md
+```
 
 ---
 
@@ -431,6 +467,12 @@ plumb/
 │   ├── test_floatmm.c
 │   ├── test_memheavy.c
 │   └── test_recursive.c
+├── benchmarks/            <- Plumb sweep across 83 LLVM-test-suite programs
+│   ├── README.md
+│   ├── fetch.sh           <- sparse-clone llvm-test-suite
+│   ├── run_bench.sh       <- compile + analyse every program
+│   ├── analyze.py         <- aggregate JSONs into SUMMARY.md
+│   └── SUMMARY.md         <- the headline report (auto-gen, committed)
 ├── dashboard/
 │   └── dashboard.html     <- interactive UI (single file, CDN libs)
 ├── scripts/
@@ -443,9 +485,12 @@ plumb/
 After running `./run.sh`, three more directories appear (all `.gitignore`d):
 
 ```
-build/      compiled pass library
-ir/         LLVM IR for every testcase x {O0,O2}
-results/    one CSV + one JSON per (testcase, opt-level) pair
+build/                          compiled pass library
+ir/                             LLVM IR for every testcase x {O0,O2}
+results/                        one CSV + one JSON per (testcase, opt-level) pair
+benchmarks/llvm-test-suite/     sparse clone of llvm/llvm-test-suite (~30 MB)
+benchmarks/ir/                  IR for every benchmark program
+benchmarks/results/             166 JSONs (one per program × opt-level)
 ```
 
 ---
@@ -458,6 +503,7 @@ results/    one CSV + one JSON per (testcase, opt-level) pair
 | [DESIGN.md](DESIGN.md)               | 10 sections     | approach, alternatives considered, tradeoff decisions, what's out of scope |
 | [IMPLEMENTATION.md](IMPLEMENTATION.md) | 11 sections   | LLVM API specifics, classification table, the macOS `dynamic_lookup` linker workaround, the flag-prefix collision story |
 | [EVALUATION.md](EVALUATION.md)       | 6 sections     | per-testcase findings, three-model baseline comparison, §5 four honest failure modes |
+| [benchmarks/SUMMARY.md](benchmarks/SUMMARY.md) | auto-gen | Plumb across 83 LLVM test-suite programs (1,165 functions, 166 runs) |
 
 ---
 

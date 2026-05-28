@@ -36,6 +36,17 @@ results/
 *.json.tmp
 *.csv.tmp
 
+# Benchmark sweep against LLVM test-suite — the cloned suite is
+# ~30 MB of upstream code and its IR/results explode in size.
+benchmarks/llvm-test-suite/
+benchmarks/ir/
+benchmarks/results/
+benchmarks/run.log
+# DO track the harness scripts and the auto-generated SUMMARY.md.
+!benchmarks/SUMMARY.md
+!benchmarks/*.sh
+!benchmarks/*.py
+
 # ── 3. Compiled binaries / object files ──────────────────────────
 # Both Linux (.so) and macOS (.dylib) loadable LLVM modules, and
 # every form of object/archive/intermediate the toolchain emits.

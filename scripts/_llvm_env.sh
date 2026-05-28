@@ -46,7 +46,7 @@ read_llvm_version() {
 }
 
 find_llvm() {
-  if [ -n "$LLVM_DIR" ] && [ -f "$LLVM_DIR/LLVMConfig.cmake" ]; then return 0; fi
+  if [ -n "${LLVM_DIR:-}" ] && [ -f "$LLVM_DIR/LLVMConfig.cmake" ]; then return 0; fi
 
   local candidates=()
   for v in "${LLVM_VERSION_PREF[@]}"; do
