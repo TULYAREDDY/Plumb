@@ -47,6 +47,10 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v4
+        with:
+          # Auto-enable Pages on first run, so the user doesn't need to flip
+          # the Settings → Pages → Source toggle manually.
+          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
