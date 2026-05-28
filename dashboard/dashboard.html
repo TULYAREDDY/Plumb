@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Plumb · Cost Analysis Dashboard</title>
+
+<!-- ── External libraries (CDN; cache once before the demo) ── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   THEME — Linear · near-black canvas + scarce lavender accent
+   Inspired by linear.app marketing system. Single chromatic
+   accent (#5e6ad2). Four-step surface ladder. Hairline borders.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  /* Brand */
+  --primary:           #5e6ad2;
+  --primary-hover:     #828fff;
+  --primary-focus:     #5e69d1;
+  --on-primary:        #ffffff;
+  --brand-secure:      #7a7fad;
+
+  /* Surface ladder (canvas → surface-1..4) */
+  --canvas:            #010102;
+  --surface-1:         #0f1011;
+  --surface-2:         #141516;
+  --surface-3:         #18191a;
+  --surface-4:         #191a1b;
+
+  /* Hairlines */
+  --hairline:          #23252a;
+  --hairline-strong:   #34343a;
+  --hairline-tertiary: #3e3e44;
+
+  /* Type */
+  --ink:               #f7f8f8;
+  --ink-muted:         #d0d6e0;
+  --ink-subtle:        #8a8f98;
+  --ink-tertiary:      #62666d;
+
+  /* Semantic — the only non-lavender accent in the system */
+  --success:           #27a644;
+
+  /* Aliases that the original markup expects */
+  --bg-1:              var(--canvas);
+  --bg-2:              var(--surface-1);
+  --bg-3:              var(--surface-2);
+  --surface:           var(--surface-1);
+  --surface-2x:        var(--surface-2);
+  --border:            var(--hairline);
+  --border-2:          var(--hairline-strong);
+  --text:              var(--ink);
+  --text-dim:          var(--ink-subtle);
+  --text-faint:        var(--ink-tertiary);
+  --primary-2:         var(--primary-hover);
+  --accent:            var(--primary);
+  --accent-2:          var(--primary-hover);
+  --heat:              var(--ink-muted);
+  --heat-2:            var(--ink);
+  --danger:            #e5484d;          /* used only for negative-diff text */
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Inter','SF Pro Display',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  color:var(--ink);
+  background:var(--canvas);
+  background-attachment:fixed;
+  min-height:100vh;
+  overflow-x:hidden;
+  letter-spacing:-0.01em;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* faint hairline grid — replaces the old animated mesh */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--hairline) 1px,transparent 1px),
+    linear-gradient(90deg,var(--hairline) 1px,transparent 1px);
+  background-size:64px 64px;
+  opacity:0.35;
+  mask-image:radial-gradient(ellipse at center,black 20%,transparent 80%);
+}
+
+/* ── Layout ── */
+.shell{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:32px 28px 96px;}
+
+/* ── Header / top nav ── */
+header.topbar{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:18px;
+  padding:12px 16px;margin-bottom:32px;
+  background:var(--canvas);
+  border:1px solid var(--hairline);
+  border-radius:8px;
+}
+.brand{display:flex;align-items:center;gap:12px;}
+.brand h1{
+  font-size:15px;font-weight:500;letter-spacing:-0.2px;color:var(--ink);
+}
+.brand .sub{
+  font-size:12px;color:var(--ink-subtle);margin-top:2px;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  letter-spacing:0;
+}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+
+/* Buttons — Linear specs: 8px 14px padding, 8px radius, 14px/500 type */
+.btn{
+  padding:8px 14px;border-radius:8px;border:1px solid var(--hairline);
+  background:var(--surface-1);color:var(--ink);
+  font-weight:500;font-size:14px;line-height:1.2;letter-spacing:0;
+  cursor:pointer;transition:background-color .12s ease, border-color .12s ease, color .12s ease;
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:inherit;
+}
+.btn:hover{background:var(--surface-2);border-color:var(--hairline-strong);}
+.btn:focus-visible{outline:2px solid var(--primary-focus);outline-offset:2px;}
+.btn.primary{
+  background:var(--primary);
+  border-color:transparent;
+  color:var(--on-primary);
+  box-shadow:none;
+}
+.btn.primary:hover{background:var(--primary-hover);}
+.btn.accent{
+  /* Linear has only one chromatic accent — fold "accent" into "primary" */
+  background:var(--primary);
+  border-color:transparent;
+  color:var(--on-primary);
+}
+.btn.accent:hover{background:var(--primary-hover);}
+.btn.ghost{background:transparent;border-color:var(--hairline);}
+.btn.ghost:hover{background:var(--surface-1);border-color:var(--hairline-strong);}
+.file-label{cursor:pointer;}
+.file-label input{display:none;}
+
+/* status pill (run label) — Linear `status-badge` */
+.run-pill{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-size:12px;line-height:1.4;
+  padding:2px 8px;border-radius:9999px;
+  color:var(--ink-muted);background:var(--surface-2);
+  border:1px solid var(--hairline);
+  letter-spacing:0;
+}
+
+/* ── KPI cards ── */
+.kpis{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;
+}
+.kpi{
+  position:relative;background:var(--surface-1);
+  border:1px solid var(--hairline);border-radius:12px;
+  padding:24px;
+  transition:background-color .12s ease, border-color .12s ease;
+}
+.kpi:hover{background:var(--surface-2);border-color:var(--hairline-strong);}
+.kpi .label{
+  font-size:13px;color:var(--ink-subtle);
+  letter-spacing:0.4px;
+  font-weight:500;text-transform:uppercase;
+}
+.kpi .value{
+  font-size:40px;font-weight:600;margin-top:8px;
+  font-family:'Inter','SF Pro Display',system-ui,sans-serif;
+  letter-spacing:-1.0px;line-height:1.15;
+  color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.kpi .unit{
+  font-size:14px;color:var(--ink-subtle);margin-left:6px;font-weight:400;
+  letter-spacing:-0.05px;
+}
+.kpi .delta{font-size:12px;margin-top:8px;color:var(--ink-subtle);font-variant-numeric:tabular-nums;}
+.kpi .ribbon{display:none;}     /* Linear has no chromatic ribbons */
+
+/* All KPI values share the same single ink color in Linear's system */
+.kpi.k1 .value,
+.kpi.k2 .value,
+.kpi.k3 .value,
+.kpi.k4 .value{color:var(--ink);}
+
+/* ── Section card ── */
+.card{
+  position:relative;background:var(--surface-1);
+  border:1px solid var(--hairline);border-radius:12px;
+  padding:24px;margin-bottom:24px;
+}
+.card-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;margin-bottom:16px;flex-wrap:wrap;
+}
+.card-title{
+  font-size:22px;font-weight:500;letter-spacing:-0.4px;line-height:1.25;color:var(--ink);
+}
+.card-title .dot{
+  display:inline-block;width:6px;height:6px;border-radius:9999px;
+  background:var(--primary);margin-right:10px;vertical-align:middle;
+  transform:translateY(-2px);
+}
+.card-sub{
+  font-size:13px;color:var(--ink-subtle);line-height:1.5;
+  font-weight:400;letter-spacing:0;
+}
+
+/* ── Grid for chart row ── */
+.grid-2{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+
+/* ── Function selector / chips ── */
+select.func-select, select.theme-select{
+  background:var(--surface-1);color:var(--ink);
+  border:1px solid var(--hairline);border-radius:8px;
+  padding:8px 12px;font-size:14px;font-family:inherit;
+  cursor:pointer;outline:none;
+  appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ink-subtle) 50%),
+                   linear-gradient(135deg,var(--ink-subtle) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+  background-size:5px 5px;background-repeat:no-repeat;
+  padding-right:32px;
+}
+select.func-select:focus, select.theme-select:focus{
+  border-color:var(--primary-focus);
+}
+.chip{
+  display:inline-block;padding:2px 8px;border-radius:9999px;
+  font-size:12px;font-weight:500;letter-spacing:0;
+  border:1px solid var(--hairline);
+  background:var(--surface-2);color:var(--ink-muted);
+  font-family:inherit;
+}
+/* Single-accent system: only HOTSPOT carries the lavender; other chips
+   stay in the muted ink ladder. */
+.chip.hot     {background:rgba(94,106,210,0.12);color:var(--primary-hover);border-color:rgba(94,106,210,0.40);}
+.chip.inline  {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
+.chip.vec     {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
+.chip.rec     {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
+.chip.complex {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
+
+/* ── Heatmap ── */
+.heatmap{display:flex;flex-wrap:wrap;gap:6px;}
+.heatcell{
+  width:40px;height:40px;border-radius:6px;
+  display:grid;place-items:center;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-size:11px;font-weight:500;color:var(--ink);
+  border:1px solid var(--hairline);
+  cursor:pointer;transition:transform .12s ease, border-color .12s ease;
+}
+.heatcell:hover{transform:translateY(-1px);border-color:var(--hairline-strong);}
+.heatcell.crit{outline:2px solid var(--primary);outline-offset:1px;}
+
+/* ── Tooltip ── */
+.tooltip{
+  position:fixed;pointer-events:none;z-index:1000;
+  background:var(--surface-2);border:1px solid var(--hairline-strong);
+  border-radius:8px;padding:10px 12px;
+  font-size:13px;color:var(--ink);max-width:300px;
+  font-family:inherit;line-height:1.5;
+  box-shadow:0 4px 12px rgba(0,0,0,0.5);
+  opacity:0;transition:opacity .12s ease;
+  letter-spacing:-0.05px;
+}
+
+/* ── Sliders ── */
+.weight-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+.weight-row{
+  background:var(--canvas);border:1px solid var(--hairline);
+  border-radius:8px;padding:14px 16px;
+}
+.weight-row .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;}
+.weight-row .name{
+  font-weight:500;font-size:14px;text-transform:capitalize;color:var(--ink);
+  letter-spacing:0;
+}
+.weight-row .val{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-size:13px;color:var(--primary-hover);font-weight:500;
+}
+input[type="range"]{
+  width:100%;height:4px;background:var(--surface-3);
+  border-radius:9999px;appearance:none;-webkit-appearance:none;cursor:pointer;
+}
+input[type="range"]::-webkit-slider-thumb{
+  appearance:none;-webkit-appearance:none;
+  width:14px;height:14px;border-radius:9999px;
+  background:var(--primary);border:0;cursor:pointer;
+  transition:background-color .12s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover{background:var(--primary-hover);}
+input[type="range"]::-moz-range-thumb{
+  width:14px;height:14px;border-radius:9999px;
+  background:var(--primary);border:0;cursor:pointer;
+}
+
+/* ── Function table ── */
+table.ftable{width:100%;border-collapse:collapse;font-size:14px;}
+table.ftable th, table.ftable td{
+  padding:10px 12px;text-align:left;border-bottom:1px solid var(--hairline);
+  letter-spacing:-0.05px;
+}
+table.ftable th{
+  color:var(--ink-subtle);font-weight:500;font-size:13px;
+  text-transform:uppercase;letter-spacing:0.4px;
+  cursor:pointer;user-select:none;
+}
+table.ftable th:hover{color:var(--ink);}
+table.ftable td{color:var(--ink);}
+table.ftable td.num{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-variant-numeric:tabular-nums;
+}
+table.ftable tr:hover td{background:var(--surface-2);}
+.bar-cell{position:relative;padding:10px 12px;}
+.bar-cell .bar{
+  position:absolute;inset:0;background:rgba(94,106,210,0.18);
+  border-radius:4px;
+}
+.bar-cell .num{
+  position:relative;z-index:1;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  color:var(--ink);
+}
+
+/* ── CFG container ── */
+#cfg{
+  height:520px;border-radius:12px;
+  background:var(--canvas);border:1px solid var(--hairline);
+}
+.cfg-legend{
+  display:flex;gap:18px;font-size:12px;color:var(--ink-subtle);
+  margin-top:12px;flex-wrap:wrap;
+}
+.legend-dot{
+  display:inline-block;width:8px;height:8px;border-radius:9999px;
+  margin-right:6px;vertical-align:middle;
+}
+
+/* ── Empty state ── */
+.empty{
+  text-align:center;padding:96px 32px;color:var(--ink-subtle);
+}
+.empty .icon{
+  font-size:13px;margin-bottom:24px;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  letter-spacing:0.4px;color:var(--ink-subtle);text-transform:uppercase;font-weight:500;
+}
+.empty h2{
+  color:var(--ink);font-size:40px;font-weight:600;margin-bottom:16px;
+  letter-spacing:-1.0px;line-height:1.15;
+}
+.empty p{
+  font-size:18px;max-width:560px;margin:0 auto 32px;line-height:1.5;
+  color:var(--ink-muted);letter-spacing:-0.1px;
+}
+.empty code{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  background:var(--surface-2);padding:2px 8px;border-radius:6px;
+  color:var(--primary-hover);font-size:14px;border:1px solid var(--hairline);
+}
+.empty .actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;}
+
+/* ── Recommendations ── */
+.recs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;}
+.rec-card{
+  background:var(--canvas);border:1px solid var(--hairline);
+  border-radius:8px;padding:16px;
+}
+.rec-card .fname{
+  font-weight:500;font-size:14px;margin-bottom:8px;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  color:var(--ink);letter-spacing:0;
+}
+.rec-card .badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+.rec-card .meta{
+  font-size:12px;color:var(--ink-subtle);
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  line-height:1.5;
+}
+
+/* ── Comparison ── */
+.compare-toggle{
+  display:inline-flex;background:var(--canvas);
+  border:1px solid var(--hairline);border-radius:9999px;padding:2px;
+}
+.compare-toggle button{
+  padding:6px 14px;border-radius:9999px;border:0;background:transparent;
+  color:var(--ink-subtle);font-weight:500;font-size:14px;cursor:pointer;
+  font-family:inherit;letter-spacing:0;line-height:1.2;
+  transition:background-color .12s ease, color .12s ease;
+}
+.compare-toggle button:hover{color:var(--ink);}
+.compare-toggle button.active{
+  background:var(--surface-2);color:var(--ink);
+}
+.diff-pos{color:var(--success);font-weight:500;}
+.diff-neg{color:var(--danger);font-weight:500;}
+
+/* ── Critical path ── */
+.path-strip{
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+}
+.path-node{
+  padding:4px 10px;border-radius:6px;
+  background:var(--surface-2);border:1px solid var(--hairline);
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-size:12px;color:var(--ink);
+}
+.path-arrow{color:var(--ink-tertiary);font-size:12px;}
+
+/* ── Footer ── */
+footer.foot{
+  text-align:center;color:var(--ink-tertiary);font-size:12px;margin-top:48px;
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  padding:24px 0;border-top:1px solid var(--hairline);
+}
+footer.foot a{color:var(--ink-subtle);text-decoration:none;}
+footer.foot a:hover{color:var(--ink);}
+
+/* ── Animations — restrained ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.card,.kpi{animation:fadeUp .25s ease both;}
+.card:nth-child(2){animation-delay:.04s;}
+.card:nth-child(3){animation-delay:.08s;}
+.card:nth-child(4){animation-delay:.12s;}
+
+/* ── Scroll bar ── */
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:var(--canvas);}
+::-webkit-scrollbar-thumb{background:var(--hairline-strong);border-radius:9999px;}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-tertiary);}
+
+/* ── Responsive (Linear breakpoints) ── */
+@media (max-width: 1024px){
+  .kpis{grid-template-columns:repeat(2,1fr);}
+  .grid-2{grid-template-columns:1fr;}
+  .grid-3{grid-template-columns:repeat(2,1fr);}
+}
+@media (max-width: 768px){
+  .shell{padding:24px 16px 64px;}
+  .kpis{grid-template-columns:1fr;}
+  .grid-3{grid-template-columns:1fr;}
+  .card-title{font-size:18px;letter-spacing:-0.3px;}
+  .empty h2{font-size:28px;letter-spacing:-0.6px;}
+  .kpi .value{font-size:32px;letter-spacing:-0.8px;}
+}
+</style>
+</head>
+<body>
+
+<div class="shell" id="shell">
+
+  <!-- ─── HEADER ─── -->
+  <header class="topbar">
+    <div class="brand">
+      <div>
+        <h1>Plumb · Cost Dashboard</h1>
+        <div class="sub" id="metaLine">no data loaded · upload a results.json to begin</div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <span class="run-pill" id="runPillA">A: —</span>
+      <label class="btn file-label">
+        Load JSON (A)
+        <input type="file" id="fileA" accept=".json" />
+      </label>
+      <span class="run-pill" id="runPillB">B: —</span>
+      <label class="btn file-label ghost">
+        Load JSON (B)
+        <input type="file" id="fileB" accept=".json" />
+      </label>
+      <button class="btn ghost"  id="loadDemo">Demo Data</button>
+      <button class="btn accent" id="exportPdf">Export PDF</button>
+    </div>
+  </header>
+
+  <!-- ─── EMPTY STATE ─── -->
+  <div id="emptyState" class="card empty">
+    <div class="icon">[ ANALYSE ]</div>
+    <h2>Drop in a <code>results.json</code> to begin</h2>
+    <p>
+      Run the LLVM pass with <code>-json-file=results.json</code>, then load the file here.
+      You can load a second JSON (e.g. <code>-O2</code>) to enable side-by-side comparison.
+    </p>
+    <div class="actions">
+      <button class="btn primary" onclick="document.getElementById('fileA').click()">Upload Run A</button>
+      <button class="btn"          onclick="loadDemoData()">Load Demo Data</button>
+    </div>
+  </div>
+
+  <!-- ─── MAIN DASHBOARD (hidden until data loads) ─── -->
+  <div id="dash" style="display:none;">
+
+    <!-- KPI ROW -->
+    <div class="kpis">
+      <div class="kpi k1"><div class="ribbon"></div>
+        <div class="label">Total Weighted Cost</div>
+        <div class="value" id="kpi-cost">0</div>
+        <div class="delta" id="kpi-cost-delta"></div>
+      </div>
+      <div class="kpi k2"><div class="ribbon"></div>
+        <div class="label">Functions Analysed</div>
+        <div class="value" id="kpi-funcs">0</div>
+        <div class="delta" id="kpi-funcs-delta"></div>
+      </div>
+      <div class="kpi k3"><div class="ribbon"></div>
+        <div class="label">Hottest Function</div>
+        <div class="value" id="kpi-hot" style="font-size:22px;">—</div>
+        <div class="delta" id="kpi-hot-delta"></div>
+      </div>
+      <div class="kpi k4"><div class="ribbon"></div>
+        <div class="label">Estimated Energy</div>
+        <div class="value" id="kpi-energy">0<span class="unit"> nJ</span></div>
+        <div class="delta" id="kpi-energy-delta"></div>
+      </div>
+    </div>
+
+    <!-- COMPARISON TOGGLE (only shows when B loaded) -->
+    <div class="card" id="compareCard" style="display:none;">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Comparison Mode</div>
+        <div class="compare-toggle" id="compareToggle">
+          <button data-mode="A"     class="active">View A</button>
+          <button data-mode="B">View B</button>
+          <button data-mode="diff">Diff (A vs B)</button>
+        </div>
+      </div>
+      <div class="card-sub">A and B can be different optimisation levels (e.g. <strong>-O0</strong> vs <strong>-O2</strong>) or different builds.
+        Diff view shows reductions in green (B improved) and increases in red.</div>
+    </div>
+
+    <!-- INSTRUCTION DONUT  +  FUNCTION RANKING -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>Instruction-Type Distribution</div>
+          <div class="card-sub">aggregate over all functions in current view</div>
+        </div>
+        <div style="height:340px;position:relative;"><canvas id="donutChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>Function Ranking · Total Cost</div>
+          <div class="card-sub">click a bar to focus that function below</div>
+        </div>
+        <div style="height:340px;position:relative;"><canvas id="rankChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- BB HEATMAP  +  CRITICAL PATH -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>BasicBlock Cost Heatmap</div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <span class="card-sub">Function:</span>
+          <select class="func-select" id="funcSelect"></select>
+        </div>
+      </div>
+      <div id="badgesRow" style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <div class="heatmap" id="heatmap"></div>
+      <div style="margin-top:18px;">
+        <div class="card-sub" style="margin-bottom:8px;">Critical Path (worst-case execution):</div>
+        <div class="path-strip" id="critPath"></div>
+      </div>
+    </div>
+
+    <!-- CFG GRAPH -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Control-Flow Graph · cost-weighted</div>
+        <div class="card-sub">node size = cost, red glow = critical path, drag to pan, scroll to zoom</div>
+      </div>
+      <div id="cfg"></div>
+      <div class="cfg-legend">
+        <span><span class="legend-dot" style="background:#23252a;border:1px solid #34343a;"></span>cool</span>
+        <span><span class="legend-dot" style="background:#5e6ad2;"></span>medium</span>
+        <span><span class="legend-dot" style="background:#828fff;"></span>hot</span>
+        <span><span class="legend-dot" style="background:#5e6ad2;outline:2px solid #5e6ad2;outline-offset:1px;"></span>critical-path node</span>
+      </div>
+    </div>
+
+    <!-- LIVE WEIGHT TUNER -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Live Weight Tuner</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span class="card-sub">drag any slider — every chart re-renders instantly</span>
+          <button class="btn ghost" id="resetWeights">Reset</button>
+        </div>
+      </div>
+      <div class="weight-grid" id="weightGrid"></div>
+    </div>
+
+    <!-- RECOMMENDATIONS -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Optimisation Recommendations</div>
+        <div class="card-sub">static analysis suggestions per function</div>
+      </div>
+      <div class="recs-grid" id="recsGrid"></div>
+    </div>
+
+    <!-- FUNCTION TABLE -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>All Functions · Sortable</div>
+        <div class="card-sub">click a column header to sort</div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="ftable" id="ftable">
+          <thead>
+            <tr>
+              <th data-key="name">Function</th>
+              <th data-key="totalCost">Cost</th>
+              <th data-key="totalInstructions">Insts</th>
+              <th data-key="cyclomaticComplexity">CC</th>
+              <th data-key="maxLoopDepth">MaxDepth</th>
+              <th data-key="energyPj">Energy(nJ)</th>
+              <th data-key="criticalPathCost">CritPath</th>
+              <th>Tags</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- #dash -->
+
+  <footer class="foot">
+    Plumb · LLVM-IR cost analysis<br/>
+    static weight + critical-path + recommendations
+  </footer>
+</div><!-- .shell -->
+
+<div id="tt" class="tooltip"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL STATE
+   ═══════════════════════════════════════════════════════════════ */
+const STATE = {
+  rawA: null,        // original parsed JSON, kept pristine
+  rawB: null,
+  workA: null,       // working copy with re-applied weights
+  workB: null,
+  weights: null,     // active slider values
+  origWeights: null, // baseline (from rawA.metadata.weights)
+  energy: null,      // pJ-per-op table
+  selectedFunc: null,
+  mode: 'A',         // 'A' | 'B' | 'diff'
+  charts: { donut:null, rank:null },
+  cy: null,
+  sortKey: 'totalCost', sortDir: 'desc'
+};
+
+const GROUPS = ["add","mul","memory","call","branch","compare","cast","alloca","phi","other"];
+/* Linear's marketing system has ONE chromatic accent — lavender (#5e6ad2).
+   For categorical encodings (donut slices, stacked bars) we sample a
+   single-hue ramp from the lavender accent down through the ink ladder
+   so the chart stays in the brand's near-monochrome key. */
+const GROUP_COLORS = {
+  add    :'#5e6ad2',  /* primary lavender */
+  mul    :'#828fff',  /* primary-hover */
+  memory :'#7a7fad',  /* brand-secure (muted lavender-gray) */
+  call   :'#5e69d1',  /* primary-focus */
+  branch :'#a4abe6',  /* lavender-tinted ink */
+  compare:'#d0d6e0',  /* ink-muted */
+  cast   :'#8a8f98',  /* ink-subtle */
+  alloca :'#62666d',  /* ink-tertiary */
+  phi    :'#3e3e44',  /* hairline-tertiary */
+  other  :'#23252a'   /* hairline */
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   FILE LOADING
+   ═══════════════════════════════════════════════════════════════ */
+document.getElementById('fileA').addEventListener('change', e => loadFile(e, 'A'));
+document.getElementById('fileB').addEventListener('change', e => loadFile(e, 'B'));
+document.getElementById('loadDemo').addEventListener('click', loadDemoData);
+document.getElementById('exportPdf').addEventListener('click', exportPdf);
+document.getElementById('resetWeights').addEventListener('click', resetWeights);
+
+function loadFile(ev, slot) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const json = JSON.parse(reader.result);
+      validate(json);
+      if (slot === 'A') STATE.rawA = json;
+      else              STATE.rawB = json;
+      onDataLoaded();
+    } catch (e) {
+      alert("Invalid JSON: " + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function validate(j) {
+  if (!j.metadata || !Array.isArray(j.functions))
+    throw new Error("Missing metadata or functions[] — was the pass run with -json-file?");
+}
+
+function loadDemoData() {
+  STATE.rawA = DEMO_A;
+  STATE.rawB = DEMO_B;
+  onDataLoaded();
+}
+
+function onDataLoaded() {
+  if (!STATE.rawA && STATE.rawB) STATE.rawA = STATE.rawB; // promote B → A
+  if (!STATE.rawA) return;
+
+  STATE.origWeights = {...(STATE.rawA.metadata.weights || {})};
+  STATE.weights     = {...STATE.origWeights};
+  STATE.energy      = STATE.rawA.metadata.energyModelPj || {};
+  STATE.workA       = recompute(STATE.rawA, STATE.weights);
+  STATE.workB       = STATE.rawB ? recompute(STATE.rawB, STATE.weights) : null;
+
+  const labelA = STATE.rawA.metadata.runLabel || 'A';
+  document.getElementById('runPillA').textContent = 'A: ' + labelA;
+  if (STATE.rawB) {
+    document.getElementById('runPillB').textContent = 'B: ' + (STATE.rawB.metadata.runLabel || 'B');
+    document.getElementById('compareCard').style.display = '';
+  } else {
+    document.getElementById('runPillB').textContent = 'B: —';
+    document.getElementById('compareCard').style.display = 'none';
+  }
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('dash').style.display = '';
+
+  document.getElementById('metaLine').textContent =
+    `module: ${STATE.rawA.metadata.module || '?'} · ` +
+    `${STATE.rawA.functions.length} functions · ` +
+    `analysed ${STATE.rawA.metadata.timestamp || ''}`;
+
+  if (!STATE.selectedFunc || !findFunc(STATE.selectedFunc))
+    STATE.selectedFunc = STATE.workA.functions[0]?.name;
+
+  buildWeightGrid();
+  bindCompareToggle();
+  bindFuncSelect();
+  bindTableSort();
+  refreshAll();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RECOMPUTE — apply user-tuned weights to a pristine JSON
+   For groups whose original weight > 0:  cost' = cost * w'/w
+   For zero-weight groups:                cost' = count * w'   (loop-info lost)
+   ═══════════════════════════════════════════════════════════════ */
+function recompute(raw, w) {
+  const out = JSON.parse(JSON.stringify(raw));
+  const orig = raw.metadata.weights || {};
+  for (const f of out.functions) {
+    let total = 0;
+    const newGroupCost = {};
+    for (const g of f.groups) {
+      const ow = orig[g.group] ?? 0;
+      const nw = w[g.group]     ?? 0;
+      let nc;
+      if (ow > 0)        nc = g.cost * (nw / ow);
+      else               nc = g.count * nw;
+      g.weight = nw;
+      g.cost   = Math.round(nc);
+      total   += g.cost;
+      newGroupCost[g.group] = g.cost;
+    }
+    // recompute pcts
+    for (const g of f.groups) g.pct = total > 0 ? (100 * g.cost / total) : 0;
+    // scale BB costs by per-function ratio (best-effort)
+    const oldTotal = f.totalCost || 1;
+    const ratio = total / oldTotal;
+    for (const b of f.basicBlocks) b.cost = Math.round(b.cost * ratio);
+    f.totalCost        = total;
+    f.criticalPathCost = Math.round((f.criticalPathCost || 0) * ratio);
+    f.isHotspot        = total > (raw.metadata.hotThreshold || 50);
+    // re-rank most-expensive group
+    let mx=-1, mxg=f.mostExpensiveGroup;
+    for (const g of f.groups) if (g.cost > mx) { mx = g.cost; mxg = g.group; }
+    f.mostExpensiveGroup = mxg;
+  }
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ACTIVE-VIEW SELECTOR
+   ═══════════════════════════════════════════════════════════════ */
+function activeData() {
+  if (STATE.mode === 'B' && STATE.workB) return STATE.workB;
+  return STATE.workA;
+}
+function findFunc(name, data) {
+  data = data || activeData();
+  return data?.functions.find(f => f.name === name);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REFRESH ALL VISUALISATIONS
+   ═══════════════════════════════════════════════════════════════ */
+function refreshAll() {
+  refreshKPIs();
+  refreshDonut();
+  refreshRankBar();
+  refreshFuncSelect();
+  refreshHeatmap();
+  refreshCFG();
+  refreshRecs();
+  refreshTable();
+}
+
+/* ── KPI ROW ── */
+function refreshKPIs() {
+  const A = STATE.workA, B = STATE.workB;
+  const view = activeData();
+  const total = view.functions.reduce((s,f) => s + f.totalCost, 0);
+  const energyNj = view.functions.reduce((s,f) => s + f.energyPj, 0) / 1000;
+  let hot = view.functions[0];
+  for (const f of view.functions) if (f.totalCost > (hot?.totalCost||-1)) hot = f;
+
+  countUp('kpi-cost',   total);
+  countUp('kpi-funcs',  view.functions.length);
+  document.getElementById('kpi-hot').textContent = hot ? hot.name : '—';
+  countUp('kpi-energy', energyNj, 1, ' nJ');
+
+  // Diff vs other side, if both loaded
+  if (A && B) {
+    const totalA  = A.functions.reduce((s,f)=>s+f.totalCost,0);
+    const totalB  = B.functions.reduce((s,f)=>s+f.totalCost,0);
+    const energyA = A.functions.reduce((s,f)=>s+f.energyPj,0)/1000;
+    const energyB = B.functions.reduce((s,f)=>s+f.energyPj,0)/1000;
+    document.getElementById('kpi-cost-delta').innerHTML  = diffLine(totalA, totalB);
+    document.getElementById('kpi-funcs-delta').textContent = `A: ${A.functions.length} · B: ${B.functions.length}`;
+    document.getElementById('kpi-energy-delta').innerHTML = diffLine(energyA, energyB, ' nJ');
+  } else {
+    document.getElementById('kpi-cost-delta').textContent = '';
+    document.getElementById('kpi-funcs-delta').textContent = '';
+    document.getElementById('kpi-energy-delta').textContent = '';
+  }
+}
+function diffLine(a, b, unit='') {
+  const d  = b - a;
+  const pc = a !== 0 ? (d / a * 100) : 0;
+  const cls = d <= 0 ? 'diff-pos' : 'diff-neg';
+  const sign = d >= 0 ? '+' : '';
+  return `A → B: <span class="${cls}">${sign}${fmt(d,1)}${unit} (${sign}${pc.toFixed(1)}%)</span>`;
+}
+function countUp(id, target, dp=0, unit='') {
+  const el = document.getElementById(id);
+  const start = parseFloat((el.dataset.cur || '0'));
+  const dur = 700; const t0 = performance.now();
+  function step(t) {
+    const k = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    const v = start + (target - start) * eased;
+    el.innerHTML = fmt(v, dp) + (unit ? `<span class="unit">${unit}</span>`:'');
+    if (k < 1) requestAnimationFrame(step);
+    else el.dataset.cur = target;
+  }
+  requestAnimationFrame(step);
+}
+function fmt(n, dp=0) {
+  if (Math.abs(n) >= 10000) return n.toLocaleString(undefined,{maximumFractionDigits:dp});
+  return Number(n).toLocaleString(undefined,{maximumFractionDigits:dp});
+}
+
+/* ── DONUT ── */
+function refreshDonut() {
+  const view = activeData();
+  const totals = {};
+  for (const f of view.functions)
+    for (const g of f.groups) totals[g.group] = (totals[g.group]||0) + g.cost;
+
+  const labels = GROUPS.filter(g => totals[g] > 0);
+  const values = labels.map(g => totals[g]);
+  const colors = labels.map(g => GROUP_COLORS[g]);
+
+  if (STATE.charts.donut) STATE.charts.donut.destroy();
+  const ctx = document.getElementById('donutChart').getContext('2d');
+  STATE.charts.donut = new Chart(ctx, {
+    type:'doughnut',
+    data:{labels, datasets:[{
+      data:values, backgroundColor:colors, borderColor:'#010102', borderWidth:2,
+      hoverOffset: 8, hoverBorderColor:'#5e6ad2'
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{
+        legend:{position:'right',
+          labels:{color:'#d0d6e0',font:{family:'Inter',size:13,weight:'400'},padding:14,
+            usePointStyle:true, pointStyle:'circle'}},
+        tooltip:{
+          backgroundColor:'#141516', borderColor:'#34343a',
+          borderWidth:1, padding:12,
+          titleColor:'#f7f8f8', bodyColor:'#d0d6e0',
+          titleFont:{family:'Inter',weight:'500',size:13},
+          bodyFont:{family:'JetBrains Mono',size:12}, displayColors:true,
+          callbacks:{
+            label: c => {
+              const total = c.dataset.data.reduce((s,v)=>s+v,0);
+              const pct = total ? (c.parsed/total*100).toFixed(1) : 0;
+              return ` ${c.label}: ${c.parsed} (${pct}%)`;
+            }
+          }
+        }
+      },
+      animation:{animateScale:true,animateRotate:true,duration:900}
+    }
+  });
+}
+
+/* ── RANK BAR ── */
+function refreshRankBar() {
+  const view = activeData();
+  const sorted = [...view.functions].sort((a,b)=>b.totalCost-a.totalCost).slice(0, 12);
+  const labels = sorted.map(f => f.name);
+  const values = sorted.map(f => f.totalCost);
+  const max = Math.max(...values, 1);
+  const colors = values.map(v => {
+    // Linear's single-accent rule: severity = lavender intensity ramp,
+    // not a green/amber/red rainbow.
+    const t = v / max;
+    if (t > 0.66) return '#828fff';     // primary-hover (hottest)
+    if (t > 0.33) return '#5e6ad2';     // primary
+    return '#5e69d1';                   // primary-focus (cool)
+  });
+
+  if (STATE.charts.rank) STATE.charts.rank.destroy();
+  const ctx = document.getElementById('rankChart').getContext('2d');
+  STATE.charts.rank = new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets:[{
+      data:values, backgroundColor:colors, borderRadius:6, borderSkipped:false,
+      hoverBackgroundColor: colors.map(c=>c)
+    }]},
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#141516', borderColor:'#34343a',
+          borderWidth:1, padding:12, displayColors:false,
+          titleColor:'#f7f8f8', bodyColor:'#d0d6e0',
+          titleFont:{family:'Inter',weight:'500',size:13},
+          bodyFont:{family:'JetBrains Mono',size:12},
+          callbacks:{ label: c => ` cost: ${c.parsed.x}` }
+        }
+      },
+      scales:{
+        x:{grid:{color:'#23252a'}, ticks:{color:'#8a8f98',font:{family:'JetBrains Mono',size:11}}},
+        y:{grid:{display:false}, ticks:{color:'#d0d6e0',font:{family:'JetBrains Mono',size:11}}}
+      },
+      onClick: (_evt, elements) => {
+        if (elements && elements.length) {
+          STATE.selectedFunc = labels[elements[0].index];
+          refreshHeatmap(); refreshCFG();
+          document.getElementById('funcSelect').value = STATE.selectedFunc;
+        }
+      },
+      animation:{duration:700, easing:'easeOutCubic'}
+    }
+  });
+}
+
+/* ── FUNCTION SELECTOR ── */
+function refreshFuncSelect() {
+  const sel = document.getElementById('funcSelect');
+  sel.innerHTML = '';
+  for (const f of activeData().functions) {
+    const o = document.createElement('option');
+    o.value = f.name; o.textContent = f.name;
+    sel.appendChild(o);
+  }
+  if (STATE.selectedFunc) sel.value = STATE.selectedFunc;
+}
+function bindFuncSelect() {
+  document.getElementById('funcSelect').addEventListener('change', e => {
+    STATE.selectedFunc = e.target.value;
+    refreshHeatmap(); refreshCFG();
+  });
+}
+
+/* ── BB HEATMAP ── */
+function refreshHeatmap() {
+  const f = findFunc(STATE.selectedFunc);
+  const wrap = document.getElementById('heatmap');
+  const badges = document.getElementById('badgesRow');
+  badges.innerHTML = '';
+  wrap.innerHTML = '';
+  if (!f) return;
+  // tag chips
+  for (const r of (f.recommendations || [])) {
+    const span = document.createElement('span');
+    span.className = 'chip ' + recClass(r);
+    span.textContent = r;
+    badges.appendChild(span);
+  }
+  badges.appendChild(chip(`CC ${f.cyclomaticComplexity}`, 'complex'));
+  badges.appendChild(chip(`depth ${f.maxLoopDepth}`));
+  badges.appendChild(chip(`${f.basicBlocks.length} BBs`));
+  badges.appendChild(chip(`crit cost ${f.criticalPathCost}`));
+
+  const max = Math.max(...f.basicBlocks.map(b => b.cost), 1);
+  for (const b of f.basicBlocks) {
+    const cell = document.createElement('div');
+    cell.className = 'heatcell' + (b.isCritical ? ' crit' : '');
+    const t = b.cost / max;
+    cell.style.background = heatColor(t);
+    cell.textContent = b.cost;
+    cell.addEventListener('mousemove', e => showTip(e,
+       `<b>${b.label}</b><br/>cost: ${b.cost}<br/>insts: ${b.instructions}<br/>loop depth: ${b.loopDepth}` +
+       (b.isCritical ? '<br/><span style="color:#828fff">on critical path</span>':'')));
+    cell.addEventListener('mouseleave', hideTip);
+    wrap.appendChild(cell);
+  }
+
+  // critical path strip
+  const strip = document.getElementById('critPath');
+  strip.innerHTML = '';
+  (f.criticalPath || []).forEach((n, i) => {
+    if (i > 0) {
+      const a = document.createElement('span'); a.className = 'path-arrow'; a.textContent = '→';
+      strip.appendChild(a);
+    }
+    const node = document.createElement('span');
+    node.className = 'path-node'; node.textContent = n;
+    strip.appendChild(node);
+  });
+}
+
+function chip(text, cls) {
+  const s = document.createElement('span');
+  s.className = 'chip' + (cls ? ' ' + cls : '');
+  s.textContent = text;
+  return s;
+}
+function recClass(r) {
+  if (r === 'HOTSPOT')          return 'hot';
+  if (r === 'INLINE_CANDIDATE') return 'inline';
+  if (r === 'VECTORIZABLE')     return 'vec';
+  if (r === 'RECURSIVE')        return 'rec';
+  if (r === 'HIGH_COMPLEXITY')  return 'complex';
+  return '';
+}
+function heatColor(t) {
+  // 0..1 → near-canvas dark → lavender → bright lavender (Linear's
+  // single-accent system: intensity ramp on one hue, no rainbow).
+  const stops = [
+    [0.00, [35, 37, 42]],     // hairline (#23252a)
+    [0.40, [94,106,210]],     // primary  (#5e6ad2)
+    [0.80, [130,143,255]],    // primary-hover (#828fff)
+    [1.00, [167,179,255]]     // hot lavender highlight
+  ];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [t0,c0] = stops[i-1], [t1,c1] = stops[i];
+      const k = (t - t0) / (t1 - t0);
+      const r = Math.round(c0[0] + (c1[0]-c0[0])*k);
+      const g = Math.round(c0[1] + (c1[1]-c0[1])*k);
+      const b = Math.round(c0[2] + (c1[2]-c0[2])*k);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+  return 'rgb(167,179,255)';
+}
+
+/* ── CFG GRAPH ── */
+function refreshCFG() {
+  const f = findFunc(STATE.selectedFunc);
+  const div = document.getElementById('cfg');
+  div.innerHTML = '';
+  if (!f || typeof cytoscape === 'undefined') return;
+
+  const max = Math.max(...f.basicBlocks.map(b => b.cost), 1);
+  const nodes = f.basicBlocks.map(b => ({
+    data:{
+      id: b.label,
+      label: `${b.label}\n[${b.cost}]`,
+      cost: b.cost,
+      crit: b.isCritical ? 1 : 0,
+      depth: b.loopDepth,
+      ins:  b.instructions
+    }
+  }));
+  const edges = [];
+  for (const b of f.basicBlocks)
+    for (const s of (b.successors||[]))
+      edges.push({ data:{ source:b.label, target:s, id:`${b.label}->${s}` } });
+
+  STATE.cy = cytoscape({
+    container: div,
+    elements: [...nodes, ...edges],
+    style: [
+      { selector:'node', style:{
+          'background-color': ele => heatColor(ele.data('cost')/max),
+          'label':'data(label)',
+          'width':  ele => 32 + 38 * (ele.data('cost')/max),
+          'height': ele => 32 + 38 * (ele.data('cost')/max),
+          'color':'#f7f8f8', 'font-size':10, 'font-family':'JetBrains Mono, ui-monospace, monospace',
+          'text-valign':'center','text-halign':'center', 'text-wrap':'wrap', 'text-max-width':80,
+          'border-width':1, 'border-color':'#34343a',
+          'transition-property':'background-color, border-color',
+          'transition-duration': '160ms'
+      }},
+      { selector:'node[crit = 1]', style:{
+          'border-width':2, 'border-color':'#5e6ad2',
+          'shadow-blur': 18, 'shadow-color':'#5e6ad2', 'shadow-opacity':0.55, 'shadow-offset-x':0, 'shadow-offset-y':0
+      }},
+      { selector:'edge', style:{
+          'width':1.4, 'line-color':'#3e3e44',
+          'target-arrow-color':'#62666d',
+          'target-arrow-shape':'triangle','curve-style':'bezier'
+      }},
+      { selector:'edge[source][target]', style:{} }
+    ],
+    layout: { name:'breadthfirst', directed:true, padding:20, spacingFactor:1.15, animate:true, animationDuration:600 },
+    minZoom:0.2, maxZoom:3.5
+  });
+
+  STATE.cy.on('tap', 'node', e => {
+    const d = e.target.data();
+    showTipFixed(`<b>${d.id}</b><br/>cost: ${d.cost}<br/>insts: ${d.ins}<br/>loop depth: ${d.depth}` +
+                 (d.crit ? '<br/><span style="color:#828fff">critical-path node</span>':''));
+  });
+  STATE.cy.on('tap', e => { if (e.target === STATE.cy) hideTip(); });
+}
+
+/* ── WEIGHT SLIDERS ── */
+function buildWeightGrid() {
+  const grid = document.getElementById('weightGrid');
+  grid.innerHTML = '';
+  for (const g of GROUPS) {
+    const w = STATE.weights[g] ?? 0;
+    const row = document.createElement('div');
+    row.className = 'weight-row';
+    row.innerHTML = `
+      <div class="top">
+        <span class="name">${g}</span>
+        <span class="val" id="wval-${g}">${w}</span>
+      </div>
+      <input type="range" min="0" max="20" step="1" value="${w}" data-grp="${g}" />
+    `;
+    grid.appendChild(row);
+  }
+  grid.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const g = e.target.dataset.grp;
+      const v = parseInt(e.target.value, 10);
+      STATE.weights[g] = v;
+      document.getElementById(`wval-${g}`).textContent = v;
+      STATE.workA = recompute(STATE.rawA, STATE.weights);
+      if (STATE.rawB) STATE.workB = recompute(STATE.rawB, STATE.weights);
+      refreshAll();
+    });
+  });
+}
+function resetWeights() {
+  STATE.weights = {...STATE.origWeights};
+  buildWeightGrid();
+  STATE.workA = recompute(STATE.rawA, STATE.weights);
+  if (STATE.rawB) STATE.workB = recompute(STATE.rawB, STATE.weights);
+  refreshAll();
+}
+
+/* ── COMPARE TOGGLE ── */
+function bindCompareToggle() {
+  document.querySelectorAll('#compareToggle button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('#compareToggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      STATE.mode = btn.dataset.mode;
+      if (STATE.mode === 'diff') renderDiffMode();
+      else refreshAll();
+    };
+  });
+}
+function renderDiffMode() {
+  // Show A as primary; recommendations card lists per-function diff
+  refreshKPIs();
+  refreshDonut(); refreshRankBar(); refreshFuncSelect();
+  refreshHeatmap(); refreshCFG();
+  refreshTable();
+  // Special diff recommendations panel
+  const A = STATE.workA, B = STATE.workB;
+  const map = new Map(B.functions.map(f => [f.name, f]));
+  const grid = document.getElementById('recsGrid');
+  grid.innerHTML = '';
+  for (const a of A.functions) {
+    const b = map.get(a.name);
+    if (!b) continue;
+    const d = b.totalCost - a.totalCost;
+    const pc = a.totalCost ? (d/a.totalCost*100).toFixed(1) : '0';
+    const cls = d <= 0 ? 'diff-pos' : 'diff-neg';
+    const sign = d >= 0 ? '+' : '';
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    card.innerHTML = `
+      <div class="fname">${a.name}</div>
+      <div class="meta">A cost: ${a.totalCost} · B cost: ${b.totalCost}</div>
+      <div class="meta">A insts: ${a.totalInstructions} · B insts: ${b.totalInstructions}</div>
+      <div class="meta" style="margin-top:6px;font-size:14px;">
+        Δ cost: <span class="${cls}">${sign}${d} (${sign}${pc}%)</span>
+      </div>`;
+    grid.appendChild(card);
+  }
+}
+
+/* ── RECOMMENDATIONS ── */
+function refreshRecs() {
+  if (STATE.mode === 'diff') return; // handled in renderDiffMode
+  const grid = document.getElementById('recsGrid');
+  grid.innerHTML = '';
+  for (const f of activeData().functions) {
+    const card = document.createElement('div');
+    card.className = 'rec-card';
+    const badges = (f.recommendations || []).map(r =>
+      `<span class="chip ${recClass(r)}">${r}</span>`).join('');
+    card.innerHTML = `
+      <div class="fname">${f.name}</div>
+      <div class="badges">${badges || '<span class="chip">no flags</span>'}</div>
+      <div class="meta">cost ${f.totalCost} · insts ${f.totalInstructions} · CC ${f.cyclomaticComplexity}</div>
+      <div class="meta">crit-path ${f.criticalPathCost} · loops ${f.loopCount} (max depth ${f.maxLoopDepth})</div>
+      <div class="meta">energy ≈ ${(f.energyPj/1000).toFixed(2)} nJ · hottest group: <b style="color:${GROUP_COLORS[f.mostExpensiveGroup]||'#fff'}">${f.mostExpensiveGroup}</b></div>`;
+    grid.appendChild(card);
+  }
+}
+
+/* ── FUNCTION TABLE ── */
+function bindTableSort() {
+  document.querySelectorAll('#ftable th[data-key]').forEach(th => {
+    th.onclick = () => {
+      const k = th.dataset.key;
+      if (STATE.sortKey === k) STATE.sortDir = (STATE.sortDir === 'asc' ? 'desc':'asc');
+      else { STATE.sortKey = k; STATE.sortDir = 'desc'; }
+      refreshTable();
+    };
+  });
+}
+function refreshTable() {
+  const tbody = document.querySelector('#ftable tbody');
+  tbody.innerHTML = '';
+  const funcs = [...activeData().functions];
+  funcs.sort((a,b) => {
+    const va = a[STATE.sortKey], vb = b[STATE.sortKey];
+    let cmp;
+    if (typeof va === 'string') cmp = va.localeCompare(vb);
+    else cmp = (va||0) - (vb||0);
+    return STATE.sortDir === 'asc' ? cmp : -cmp;
+  });
+  const maxCost = Math.max(...funcs.map(f => f.totalCost), 1);
+  for (const f of funcs) {
+    const tr = document.createElement('tr');
+    const tags = (f.recommendations||[]).map(r =>
+      `<span class="chip ${recClass(r)}" style="font-size:10px;padding:2px 7px;">${r}</span>`).join(' ');
+    const barW = (f.totalCost / maxCost) * 100;
+    tr.innerHTML = `
+      <td><b style="font-family:'JetBrains Mono';">${f.name}</b></td>
+      <td class="bar-cell"><div class="bar" style="width:${barW}%;"></div><span class="num">${f.totalCost}</span></td>
+      <td class="num">${f.totalInstructions}</td>
+      <td class="num">${f.cyclomaticComplexity}</td>
+      <td class="num">${f.maxLoopDepth}</td>
+      <td class="num">${(f.energyPj/1000).toFixed(2)}</td>
+      <td class="num">${f.criticalPathCost}</td>
+      <td>${tags}</td>`;
+    tr.onclick = () => {
+      STATE.selectedFunc = f.name;
+      document.getElementById('funcSelect').value = f.name;
+      refreshHeatmap(); refreshCFG();
+      document.getElementById('heatmap').scrollIntoView({behavior:'smooth', block:'center'});
+    };
+    tbody.appendChild(tr);
+  }
+}
+
+/* ── TOOLTIP ── */
+function showTip(e, html) {
+  const tt = document.getElementById('tt');
+  tt.innerHTML = html; tt.style.opacity = 1;
+  tt.style.left = (e.clientX + 12) + 'px';
+  tt.style.top  = (e.clientY + 12) + 'px';
+}
+function showTipFixed(html) {
+  const tt = document.getElementById('tt');
+  tt.innerHTML = html; tt.style.opacity = 1;
+  tt.style.left = '40px'; tt.style.top  = '80px';
+}
+function hideTip() { document.getElementById('tt').style.opacity = 0; }
+
+/* ── PDF EXPORT ── */
+async function exportPdf() {
+  const tgt = document.getElementById('shell');
+  document.getElementById('exportPdf').disabled = true;
+  document.getElementById('exportPdf').textContent = 'Rendering…';
+  await new Promise(r => setTimeout(r, 200));
+  try {
+    const canvas = await html2canvas(tgt, {
+      backgroundColor:'#010102',
+      scale: 1.2, useCORS:true, logging:false
+    });
+    const img = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation:'portrait', unit:'pt', format:'a4' });
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const ratio = canvas.width / canvas.height;
+    const w = W; const h = w / ratio;
+    let y = 0;
+    if (h <= H) pdf.addImage(img, 'PNG', 0, 0, w, h);
+    else {
+      // tile vertically
+      const pageHeightInCanvas = canvas.height * (H / h);
+      let offset = 0;
+      while (offset < canvas.height) {
+        const slice = document.createElement('canvas');
+        slice.width = canvas.width;
+        slice.height = Math.min(pageHeightInCanvas, canvas.height - offset);
+        slice.getContext('2d').drawImage(canvas, 0, -offset);
+        pdf.addImage(slice.toDataURL('image/png'), 'PNG', 0, 0, w, slice.height * (w / canvas.width));
+        offset += pageHeightInCanvas;
+        if (offset < canvas.height) pdf.addPage();
+      }
+    }
+    pdf.save(`plumb-report-${Date.now()}.pdf`);
+  } catch (e) {
+    alert('PDF export failed: ' + e.message);
+  } finally {
+    document.getElementById('exportPdf').disabled = false;
+    document.getElementById('exportPdf').textContent = 'Export PDF';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DEMO DATA  (so dashboard works even before pass is built)
+   ═══════════════════════════════════════════════════════════════ */
+const DEMO_A = {
+  metadata:{
+    tool:'Plumb', version:'2.0', runLabel:'O0', module:'demo.bc',
+    timestamp:'2026-05-03T10:00:00Z', hotThreshold:50, inlineThreshold:20,
+    weights:{add:1,mul:2,memory:3,call:5,branch:1,compare:1,cast:1,alloca:1,phi:0,other:0},
+    energyModelPj:{add:0.4,mul:3.4,memory:50,call:100,branch:0.1,compare:0.1,cast:0.5,alloca:5,phi:0.05,other:1},
+    totals:{totalCost:412,totalInstructions:178,functionCount:5,estimatedEnergyPj:9874}
+  },
+  functions:[
+    { name:'matmul', totalCost:240, totalInstructions:62, cyclomaticComplexity:7, loopCount:3, maxLoopDepth:3,
+      energyPj:6500, criticalPathCost:204, isHotspot:true, isRecursive:false,
+      mostExpensiveGroup:'memory',
+      recommendations:['HOTSPOT','VECTORIZABLE'],
+      criticalPath:['entry','i.head','j.head','k.head','k.body','j.tail','i.tail','exit'],
+      groups:[
+        {group:'add',count:9,weight:1,cost:18,pct:7.5,indirect:0},
+        {group:'mul',count:6,weight:2,cost:24,pct:10,indirect:0},
+        {group:'memory',count:14,weight:3,cost:126,pct:52.5,indirect:0},
+        {group:'branch',count:8,weight:1,cost:24,pct:10,indirect:0},
+        {group:'compare',count:6,weight:1,cost:18,pct:7.5,indirect:0},
+        {group:'alloca',count:4,weight:1,cost:4,pct:1.7,indirect:0},
+        {group:'cast',count:4,weight:1,cost:12,pct:5,indirect:0},
+        {group:'phi',count:11,weight:0,cost:14,pct:5.8,indirect:0}
+      ],
+      basicBlocks:[
+        {label:'entry',cost:6,instructions:6,loopDepth:0,isCritical:true,successors:['i.head']},
+        {label:'i.head',cost:8,instructions:4,loopDepth:1,isCritical:true,successors:['j.head','exit']},
+        {label:'j.head',cost:14,instructions:6,loopDepth:2,isCritical:true,successors:['k.head','j.tail']},
+        {label:'k.head',cost:30,instructions:8,loopDepth:3,isCritical:true,successors:['k.body','j.tail']},
+        {label:'k.body',cost:120,instructions:18,loopDepth:3,isCritical:true,successors:['k.head']},
+        {label:'j.tail',cost:14,instructions:6,loopDepth:2,isCritical:true,successors:['j.head']},
+        {label:'i.tail',cost:8,instructions:4,loopDepth:1,isCritical:true,successors:['i.head']},
+        {label:'exit',cost:4,instructions:2,loopDepth:0,isCritical:true,successors:[]}
+      ]
+    },
+    { name:'fib', totalCost:48, totalInstructions:18, cyclomaticComplexity:3, loopCount:0, maxLoopDepth:0,
+      energyPj:1240, criticalPathCost:42, isHotspot:false, isRecursive:true,
+      mostExpensiveGroup:'call',
+      recommendations:['RECURSIVE'],
+      criticalPath:['entry','rec','exit'],
+      groups:[
+        {group:'add',count:2,weight:1,cost:2,pct:4.2,indirect:0},
+        {group:'compare',count:1,weight:1,cost:1,pct:2.1,indirect:0},
+        {group:'branch',count:2,weight:1,cost:2,pct:4.2,indirect:0},
+        {group:'call',count:2,weight:5,cost:30,pct:62.5,indirect:0},
+        {group:'memory',count:3,weight:3,cost:9,pct:18.8,indirect:0},
+        {group:'alloca',count:2,weight:1,cost:2,pct:4.2,indirect:0},
+        {group:'phi',count:1,weight:0,cost:0,pct:0,indirect:0}
+      ],
+      basicBlocks:[
+        {label:'entry',cost:6,instructions:5,loopDepth:0,isCritical:true,successors:['base','rec']},
+        {label:'base',cost:4,instructions:2,loopDepth:0,isCritical:false,successors:['exit']},
+        {label:'rec',cost:36,instructions:9,loopDepth:0,isCritical:true,successors:['exit']},
+        {label:'exit',cost:2,instructions:2,loopDepth:0,isCritical:true,successors:[]}
+      ]
+    },
+    { name:'square', totalCost:6, totalInstructions:6, cyclomaticComplexity:1, loopCount:0, maxLoopDepth:0,
+      energyPj:120, criticalPathCost:6, isHotspot:false, isRecursive:false,
+      mostExpensiveGroup:'memory',
+      recommendations:['INLINE_CANDIDATE'],
+      criticalPath:['entry'],
+      groups:[
+        {group:'memory',count:2,weight:3,cost:6,pct:100,indirect:0},
+        {group:'mul',count:1,weight:2,cost:0,pct:0,indirect:0},
+        {group:'alloca',count:1,weight:1,cost:0,pct:0,indirect:0}
+      ],
+      basicBlocks:[
+        {label:'entry',cost:6,instructions:6,loopDepth:0,isCritical:true,successors:[]}
+      ]
+    },
+    { name:'classify', totalCost:38, totalInstructions:22, cyclomaticComplexity:6, loopCount:0, maxLoopDepth:0,
+      energyPj:520, criticalPathCost:18, isHotspot:false, isRecursive:false,
+      mostExpensiveGroup:'branch',
+      recommendations:[],
+      criticalPath:['entry','t1','t2','t3','exit'],
+      groups:[
+        {group:'compare',count:6,weight:1,cost:6,pct:15.8,indirect:0},
+        {group:'branch',count:7,weight:1,cost:7,pct:18.4,indirect:0},
+        {group:'memory',count:5,weight:3,cost:15,pct:39.5,indirect:0},
+        {group:'cast',count:2,weight:1,cost:2,pct:5.3,indirect:0},
+        {group:'add',count:2,weight:1,cost:2,pct:5.3,indirect:0},
+        {group:'phi',count:0,weight:0,cost:0,pct:0,indirect:0}
+      ],
+      basicBlocks:[
+        {label:'entry',cost:5,instructions:4,loopDepth:0,isCritical:true,successors:['t1','exit']},
+        {label:'t1',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['t2','exit']},
+        {label:'t2',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['t3','exit']},
+        {label:'t3',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['exit']},
+        {label:'exit',cost:15,instructions:9,loopDepth:0,isCritical:true,successors:[]}
+      ]
+    },
+    { name:'main', totalCost:80, totalInstructions:70, cyclomaticComplexity:4, loopCount:1, maxLoopDepth:1,
+      energyPj:1494, criticalPathCost:64, isHotspot:false, isRecursive:false,
+      mostExpensiveGroup:'call',
+      recommendations:[],
+      criticalPath:['entry','loop','exit'],
+      groups:[
+        {group:'memory',count:8,weight:3,cost:24,pct:30,indirect:0},
+        {group:'call',count:6,weight:5,cost:30,pct:37.5,indirect:0},
+        {group:'add',count:6,weight:1,cost:6,pct:7.5,indirect:0},
+        {group:'branch',count:3,weight:1,cost:3,pct:3.8,indirect:0},
+        {group:'compare',count:2,weight:1,cost:2,pct:2.5,indirect:0},
+        {group:'alloca',count:5,weight:1,cost:5,pct:6.2,indirect:0},
+        {group:'cast',count:3,weight:1,cost:3,pct:3.8,indirect:0},
+        {group:'other',count:7,weight:0,cost:0,pct:0,indirect:0},
+        {group:'phi',count:0,weight:0,cost:0,pct:0,indirect:0}
+      ],
+      basicBlocks:[
+        {label:'entry',cost:24,instructions:24,loopDepth:0,isCritical:true,successors:['loop']},
+        {label:'loop',cost:48,instructions:32,loopDepth:1,isCritical:true,successors:['loop','exit']},
+        {label:'exit',cost:8,instructions:14,loopDepth:0,isCritical:true,successors:[]}
+      ]
+    }
+  ]
+};
+
+// O2-style demo: same functions, optimised costs (smaller, fewer BBs)
+const DEMO_B = JSON.parse(JSON.stringify(DEMO_A));
+DEMO_B.metadata.runLabel = 'O2';
+DEMO_B.metadata.timestamp = '2026-05-03T10:05:00Z';
+for (const f of DEMO_B.functions) {
+  const factor = f.name === 'matmul' ? 0.55 : (f.name === 'fib' ? 0.65 : 0.78);
+  f.totalCost = Math.round(f.totalCost * factor);
+  f.totalInstructions = Math.round(f.totalInstructions * factor);
+  f.energyPj = Math.round(f.energyPj * factor);
+  f.criticalPathCost = Math.round(f.criticalPathCost * factor);
+  for (const g of f.groups) g.cost = Math.round(g.cost * factor);
+  for (const b of f.basicBlocks) {
+    b.cost = Math.round(b.cost * factor);
+    b.instructions = Math.round(b.instructions * factor);
+  }
+}
+</script>
+</body>
+</html>

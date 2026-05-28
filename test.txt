@@ -1,5 +1,0 @@
-vboxuser@Ubuntu:~/weighted-inst-freq$ git push -u origin main
-Username for 'https://github.com': TULYAREDDY
-Password for 'https://TULYAREDDY@github.com': 
-remote: Invalid username or token. Password authentication is not supported for Git operations.
-fatal: Authentication failed for 'https://github.com/TULYAREDDY/weighted-inst-freq.git/'
