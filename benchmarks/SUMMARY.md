@@ -12,10 +12,10 @@ This file aggregates Plumb's output across **83 programs** from the official [LL
 | Programs successfully analysed | **83** |
 | O0 + O2 runs                    | **166** |
 | Total functions covered         | **1,165** |
-| Median cost reduction at -O2    | **-56.0%** |
+| Median cost reduction at -O2    | **-54.7%** |
 | Programs where -O2 cost rose¹   | **3/83** |
 | Biggest cost reduction          | `Shootout__nestedloop` (-95.3%) |
-| Biggest cost increase           | `Shootout__matrix` (+111.7%) |
+| Biggest cost increase           | `Shootout__matrix` (+112.8%) |
 
 ¹ The -O2 cost increase is the inliner-inflation failure mode documented in [EVALUATION.md §5.1](../EVALUATION.md#5-failure-cases). At scale, it affects **4%** of programs.
 
@@ -32,30 +32,30 @@ For each program at `-O0`, which instruction group dominated its weighted cost?
 
 | Suite | Programs | Σ cost (O0) | mean cost / program |
 |---|---:|---:|---:|
-| Misc | 28 | 50,372 | 1,799 |
-| Polybench | 30 | 76,990 | 2,566 |
-| Shootout | 14 | 6,027 | 430 |
-| Stanford | 11 | 8,575 | 780 |
+| Misc | 28 | 51,031 | 1,823 |
+| Polybench | 30 | 77,922 | 2,597 |
+| Shootout | 14 | 6,045 | 432 |
+| Stanford | 11 | 8,635 | 785 |
 
 ## Top 15 hottest programs (by total weighted cost @ -O0)
 
 | Rank | Program | Cost (O0) | Cost (O2) | Δ% | Hottest function |
 |---:|---|---:|---:|---:|---|
-| 1 | `Misc__himenobmtxpa` | 12,308 | 2,725 | -78% | `jacobi` (10669) |
-| 2 | `Misc__oourafft` | 11,765 | 2,947 | -75% | `cftmdl` (3176) |
-| 3 | `Polybench__medley__deriche__deriche` | 4,495 | 1,318 | -71% | `kernel_deriche` (1577) |
-| 4 | `Misc__ReedSolomon` | 3,906 | 2,201 | -44% | `decode_rs` (2650) |
-| 5 | `Misc__whetstone` | 3,821 | 1,130 | -70% | `main` (3482) |
-| 6 | `Polybench__medley__nussinov__nussinov` | 3,792 | 802 | -79% | `kernel_nussinov` (1272) |
-| 7 | `Polybench__linear-algebra__kernels__3mm__3mm` | 3,672 | 1,120 | -69% | `kernel_3mm` (921) |
-| 8 | `Polybench__stencils__fdtd-2d__fdtd-2d` | 3,636 | 1,924 | -47% | `kernel_fdtd_2d` (1068) |
-| 9 | `Misc__flops` | 3,530 | 2,450 | -31% | `main` (3478) |
-| 10 | `Polybench__stencils__heat-3d__heat-3d` | 3,449 | 1,637 | -53% | `kernel_heat_3d` (2210) |
-| 11 | `Polybench__linear-algebra__solvers__ludcmp__ludcmp` | 3,360 | 1,180 | -65% | `kernel_ludcmp` (949) |
-| 12 | `Polybench__stencils__adi__adi` | 3,336 | 1,203 | -64% | `kernel_adi` (2048) |
-| 13 | `Misc__ffbench` | 3,194 | 794 | -75% | `fourn` (2476) |
-| 14 | `Polybench__linear-algebra__kernels__2mm__2mm` | 3,130 | 1,272 | -59% | `kernel_2mm` (658) |
-| 15 | `Polybench__linear-algebra__solvers__gramschmidt__gramschmidt` | 3,046 | 1,338 | -56% | `kernel_gramschmidt` (813) |
+| 1 | `Misc__himenobmtxpa` | 12,318 | 2,811 | -77% | `jacobi` (10669) |
+| 2 | `Misc__oourafft` | 11,787 | 3,066 | -74% | `cftmdl` (3177) |
+| 3 | `Polybench__medley__deriche__deriche` | 4,524 | 1,361 | -70% | `kernel_deriche` (1579) |
+| 4 | `Misc__ReedSolomon` | 3,987 | 2,342 | -41% | `decode_rs` (2698) |
+| 5 | `Misc__whetstone` | 3,843 | 1,192 | -69% | `main` (3500) |
+| 6 | `Polybench__medley__nussinov__nussinov` | 3,811 | 817 | -79% | `kernel_nussinov` (1272) |
+| 7 | `Polybench__linear-algebra__kernels__3mm__3mm` | 3,721 | 1,167 | -69% | `kernel_3mm` (921) |
+| 8 | `Polybench__stencils__fdtd-2d__fdtd-2d` | 3,665 | 2,032 | -45% | `kernel_fdtd_2d` (1068) |
+| 9 | `Misc__flops` | 3,656 | 2,583 | -29% | `main` (3604) |
+| 10 | `Polybench__stencils__heat-3d__heat-3d` | 3,472 | 1,720 | -50% | `kernel_heat_3d` (2210) |
+| 11 | `Polybench__stencils__adi__adi` | 3,395 | 1,278 | -62% | `kernel_adi` (2086) |
+| 12 | `Polybench__linear-algebra__solvers__ludcmp__ludcmp` | 3,387 | 1,217 | -64% | `kernel_ludcmp` (955) |
+| 13 | `Misc__ffbench` | 3,222 | 837 | -74% | `fourn` (2494) |
+| 14 | `Polybench__linear-algebra__kernels__2mm__2mm` | 3,179 | 1,397 | -56% | `kernel_2mm` (658) |
+| 15 | `Polybench__linear-algebra__kernels__doitgen__doitgen` | 3,071 | 2,067 | -33% | `kernel_doitgen` (591) |
 
 ## Programs where -O2 *increased* cost
 
@@ -63,9 +63,9 @@ This is the static-model blind spot we documented in [EVALUATION.md §5.1](../EV
 
 | Program | O0 | O2 | Δ |
 |---|---:|---:|---:|
-| `Shootout__matrix` | 798 | 1,689 | +112% |
-| `Shootout__objinst` | 495 | 508 | +3% |
-| `Misc__richards_benchmark` | 1,353 | 1,358 | +0% |
+| `Shootout__matrix` | 798 | 1,698 | +113% |
+| `Shootout__objinst` | 497 | 508 | +2% |
+| `Misc__richards_benchmark` | 1,363 | 1,383 | +1% |
 
 ## Reproduce
 

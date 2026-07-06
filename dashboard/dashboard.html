@@ -769,7 +769,16 @@ function onDataLoaded() {
 function recompute(raw, w) {
   const out = JSON.parse(JSON.stringify(raw));
   const orig = raw.metadata.weights || {};
+  const hotThreshold    = raw.metadata.hotThreshold    ?? 50;
+  const inlineThreshold = raw.metadata.inlineThreshold ?? 20;
   for (const f of out.functions) {
+    // Structural tags don't depend on cost, so they survive re-weighting
+    // as-is; only HOTSPOT / INLINE_CANDIDATE are threshold-driven and get
+    // rebuilt below from the re-weighted total.
+    const hadVectorizable  = (f.recommendations || []).includes('VECTORIZABLE');
+    const hadRecursive     = (f.recommendations || []).includes('RECURSIVE');
+    const hadHighComplexity = (f.recommendations || []).includes('HIGH_COMPLEXITY');
+
     let total = 0;
     const newGroupCost = {};
     for (const g of f.groups) {
@@ -791,11 +800,21 @@ function recompute(raw, w) {
     for (const b of f.basicBlocks) b.cost = Math.round(b.cost * ratio);
     f.totalCost        = total;
     f.criticalPathCost = Math.round((f.criticalPathCost || 0) * ratio);
-    f.isHotspot        = total > (raw.metadata.hotThreshold || 50);
+    f.isHotspot        = total > hotThreshold;
     // re-rank most-expensive group
     let mx=-1, mxg=f.mostExpensiveGroup;
     for (const g of f.groups) if (g.cost > mx) { mx = g.cost; mxg = g.group; }
     f.mostExpensiveGroup = mxg;
+
+    // Rebuild recommendations to match the pass's own ordering
+    // (INLINE_CANDIDATE, VECTORIZABLE, RECURSIVE, HOTSPOT, HIGH_COMPLEXITY).
+    const recs = [];
+    if (total < inlineThreshold && f.name !== 'main') recs.push('INLINE_CANDIDATE');
+    if (hadVectorizable)   recs.push('VECTORIZABLE');
+    if (hadRecursive)      recs.push('RECURSIVE');
+    if (f.isHotspot)       recs.push('HOTSPOT');
+    if (hadHighComplexity) recs.push('HIGH_COMPLEXITY');
+    f.recommendations = recs;
   }
   return out;
 }

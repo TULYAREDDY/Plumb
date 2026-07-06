@@ -31,7 +31,7 @@ Every cost number traces back to `(group, count, weight, depth)` — no black-bo
 
 > **Real example.** On the `matmul()` from `testcases/test_floatmm.c`, raw instruction count says 78. Plumb at default weights says 335 — and pinpoints `bb.6` (the depth-3 inner accumulator) as the hot block carrying ~45% of total cost. After `-O2`, that drops to 81 (−76%), with the hotspot moving cleanly out of the inner body. [See §3.4 in EVALUATION.md](EVALUATION.md#34-test_floatmmc--depth-multiplier-in-action)
 >
-> **Validated at scale.** Across 83 programs from LLVM's official test-suite (1,165 functions, 166 runs), Plumb's median -O2 cost reduction is 56%, and its top hot function lines up with the canonical kernel name (Jacobi, FFT, `kernel_*`) on every numerical workload. [Full sweep in benchmarks/SUMMARY.md](benchmarks/SUMMARY.md)
+> **Validated at scale.** Across 83 programs from LLVM's official test-suite (1,165 functions, 166 runs), Plumb's median -O2 cost reduction is 55%, and its top hot function lines up with the canonical kernel name (Jacobi, FFT, `kernel_*`) on every numerical workload. [Full sweep in benchmarks/SUMMARY.md](benchmarks/SUMMARY.md)
 
 ---
 
@@ -199,9 +199,9 @@ Six C programs, each engineered to stress a different cost class. Each is run at
 |---:|:---|:---|:---:|---:|
 | 1 | [`test_arith.c`](testcases/test_arith.c)         | mixed arithmetic + nested loops + calls          | spread       | 493 |
 | 2 | [`test_branchy.c`](testcases/test_branchy.c)     | switch + nested ifs (high cyclomatic complexity) | branch + mem | 303 |
-| 3 | [`test_callchain.c`](testcases/test_callchain.c) | direct + indirect (function pointer) calls       | call         | 229 |
+| 3 | [`test_callchain.c`](testcases/test_callchain.c) | direct + indirect (function pointer) calls       | call         | 231 |
 | 4 | [`test_floatmm.c`](testcases/test_floatmm.c)     | triple-nested float matmul (depth 3)             | memory       | **514** |
-| 5 | [`test_memheavy.c`](testcases/test_memheavy.c)   | 5-point stencil + indirect-load reduction        | memory       | 355 |
+| 5 | [`test_memheavy.c`](testcases/test_memheavy.c)   | 5-point stencil + indirect-load reduction        | memory       | 357 |
 | 6 | [`test_recursive.c`](testcases/test_recursive.c) | self-recursion + leaf functions                  | call         | 164 |
 
 Per-testcase findings, per-function deltas, and the failure cases live in [**EVALUATION.md**](EVALUATION.md).
@@ -224,14 +224,14 @@ The six testcases in [`testcases/`](testcases/) are designed to stress specific 
    ┌────────────────────────────────────────────────────────────┐
    │   83 programs · 1,165 functions · 166 runs (O0 + O2)       │
    │                                                            │
-   │   Median cost reduction at -O2     ─→   56 %               │
+   │   Median cost reduction at -O2     ─→   55 %               │
    │   Programs whose hottest fn          memory-dominated 99 % │
    │   Inliner-inflation failure mode    ─→   4 % of programs   │
    │                                                            │
    │   Top-3 hottest at -O0:                                    │
    │     1.  Misc/himenobmtxpa  →  jacobi          (cost 10669) │
-   │     2.  Misc/oourafft       →  cftmdl          (cost  3176) │
-   │     3.  Polybench/deriche  →  kernel_deriche  (cost  1577) │
+   │     2.  Misc/oourafft       →  cftmdl          (cost  3177) │
+   │     3.  Polybench/deriche  →  kernel_deriche  (cost  1579) │
    └────────────────────────────────────────────────────────────┘
 ```
 

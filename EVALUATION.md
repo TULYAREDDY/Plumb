@@ -49,23 +49,30 @@ IR for every testcase:
 | Testcase | level | A. raw | B. weighted | **C. +depth** | top function | energy (pJ) |
 |---|---|---:|---:|---:|---|---:|
 | test_arith       | O0 | 207 | 418 | **493** | matrix_add   |  5784.3 |
-| test_arith       | O2 | 142 | 152 | **196** | matrix_add   |  1221.0 |
+| test_arith       | O2 | 142 | 157 | **201** | matrix_add   |  1218.0 |
 | test_branchy     | O0 | 164 | 303 | **303** | parse_int    |  3845.9 |
 | test_branchy     | O2 |  81 | 128 | **128** | main         |  1733.5 |
-| test_callchain   | O0 | 109 | 226 | **229** | run_pipeline |  3362.9 |
-| test_callchain   | O2 |  32 |  34 |  **37** | run_pipeline |   367.6 |
+| test_callchain   | O0 | 109 | 228 | **231** | run_pipeline |  3365.3 |
+| test_callchain   | O2 |  32 |  37 |  **40** | run_pipeline |   369.4 |
 | test_floatmm     | O0 | 174 | 336 | **514** | matmul       |  4487.9 |
-| test_floatmm     | O2 | 228 | 469 | **513** | main         |  7546.8 |
-| test_memheavy    | O0 | 148 | 267 | **355** | stencil      |  3519.4 |
-| test_memheavy    | O2 | 650 | 796 | **796** | main         |  8724.1 |
+| test_floatmm     | O2 | 228 | 470 | **514** | main         |  7546.1 |
+| test_memheavy    | O0 | 148 | 269 | **357** | stencil      |  3521.8 |
+| test_memheavy    | O2 | 650 | 810 | **810** | main         |  8715.8 |
 | test_recursive   | O0 |  76 | 164 | **164** | main         |  2311.4 |
-| test_recursive   | O2 |  76 | 108 | **108** | main         |  1135.2 |
+| test_recursive   | O2 |  76 | 109 | **109** | main         |  1134.6 |
+
+> These numbers reflect a classifier fix (see project notes): `Div`/`Rem`/bitwise/shift
+> ops and `invoke`/atomic instructions were previously mis-bucketed into the
+> zero-weight `other` group instead of `mul` / `add` / `call` / `memory` as the
+> tables in this document and `IMPLEMENTATION.md` §3 always claimed. Rows without
+> such instructions (`test_branchy`, `test_floatmm` @ O0, `test_recursive` @ O0)
+> are byte-for-byte unchanged.
 
 ### What each column adds
 
 | Comparison | Insight |
 |---|---|
-| **A → B** (`+weight`)        | Memory/call-heavy code separates from arithmetic. `test_callchain` jumps 109 → 226 (+108 %) because every call is now charged 5×. `test_branchy` jumps 164 → 303 (+85 %) because parse_int is dominated by loads. Pure arithmetic (`test_arith` after the inliner runs in O2) barely moves: 142 → 152. |
+| **A → B** (`+weight`)        | Memory/call-heavy code separates from arithmetic. `test_callchain` jumps 109 → 228 (+109 %) because every call is now charged 5×. `test_branchy` jumps 164 → 303 (+85 %) because parse_int is dominated by loads. Pure arithmetic (`test_arith` after the inliner runs in O2) barely moves: 142 → 157. |
 | **B → C** (`+depth`)         | Deep loops emerge. `test_floatmm` jumps 336 → 514 (+53 %) — the depth-3 matmul body is correctly multiplied. `test_branchy` and `test_recursive` don't move because their loops are depth 1. This is exactly what the model is supposed to do. |
 
 **Ranking flips.** Switching to model C changes the function ranking
@@ -86,9 +93,9 @@ multiplier carries information the simpler models lose:
 
 | function | O0 cost | O2 cost | Δ | recommendations (O0) |
 |---|---:|---:|---:|---|
-| matrix_add | 193 | 111 | −42 % | `VECTORIZABLE`, `HOTSPOT` |
+| matrix_add | 193 | 115 | −40 % | `VECTORIZABLE`, `HOTSPOT` |
 | main       |  86 |  25 | −71 % | `HOTSPOT` |
-| process    |  83 |  47 | −43 % | `HOTSPOT` (O0) → `VECTORIZABLE`, `HOTSPOT` (O2) |
+| process    |  83 |  48 | −42 % | `HOTSPOT` (O0) → `VECTORIZABLE`, `HOTSPOT` (O2) |
 | compute    |  60 |   3 | −95 % | `HOTSPOT` → `INLINE_CANDIDATE` |
 | classify   |  39 |   6 | −85 % | `HOTSPOT` → `INLINE_CANDIDATE` |
 | scale      |  32 |   4 | −88 % | `HOTSPOT` → `INLINE_CANDIDATE` |
@@ -135,12 +142,12 @@ At -O2 the inliner annihilates almost everything:
 
 | function | O0 | O2 | Δ |
 |---|---:|---:|---:|
-| run_pipeline    | 108 | 30 | −72 % |
+| run_pipeline    | 110 | 32 | −71 % |
 | pipeline_direct |  22 | gone | inlined away |
 | add1, mul2, neg |   8 ish |  0–1 | inlined |
 | main            |  52 |  5 | −90 % |
 
-Total testcase cost drops 229 → 37 (−84 %), the largest reduction in
+Total testcase cost drops 231 → 40 (−83 %), the largest reduction in
 the suite, because every direct call is inlinable at this size. The
 indirect dispatch through the function-pointer table survives, which
 is exactly the case the heuristic is designed to keep visible.
@@ -183,9 +190,13 @@ iteration two loads, defeating any chance of register promotion.
 
 `fib` and `fact` are tagged `RECURSIVE` at both opt levels because
 they directly call themselves. The `square` leaf goes
-`INLINE_CANDIDATE → INLINE_CANDIDATE` (cost stays low), and the
-`HOTSPOT` tag lifts off `fib` and `fact` at -O2 as their inlined call
-sites move cost into `main`.
+`INLINE_CANDIDATE → INLINE_CANDIDATE` (cost stays low). At -O2, `fib`
+drops from 44 to 14 — below the hot threshold (30), so `HOTSPOT` lifts
+off and it becomes `INLINE_CANDIDATE` instead. `fact` drops from 36 to
+34, which is a real reduction but *not* enough to cross the threshold,
+so it correctly keeps its `HOTSPOT` tag at -O2 too — recursion makes it
+resistant to the same shrinkage `fib` gets from tail-call-shaped
+inlining.
 
 ---
 
@@ -228,9 +239,9 @@ The strongest honest failure mode in the suite:
 
 | function | O0 | O2 | Δ | reason |
 |---|---:|---:|---:|---|
-| `test_memheavy::main`     |  78 | 435 | **+458 %** | callees inlined into main |
+| `test_memheavy::main`     |  80 | 435 | **+444 %** | callees inlined into main |
 | `test_floatmm::main`      | 112 | 378 | **+238 %** | callees inlined into main |
-| `test_memheavy::stencil`  | 212 | 322 |  **+52 %** | inner loop unrolled |
+| `test_memheavy::stencil`  | 212 | 334 |  **+58 %** | inner loop unrolled |
 
 These are not bugs in the pass — they are an honest reflection of the
 IR. After `-O2` inlining and unrolling, `main` literally contains more
@@ -248,7 +259,7 @@ total module cost still drops O0 → O2.
 **At scale.** When we ran Plumb across 83 programs of LLVM's official
 test-suite (see [`benchmarks/SUMMARY.md`](benchmarks/SUMMARY.md)),
 this failure mode showed up in **3 of 83 programs (~4%)**. The biggest
-in-the-wild offender was `Shootout/matrix.c` at +112%. So the issue
+in-the-wild offender was `Shootout/matrix.c` at +113%. So the issue
 is real, but the *rate* is low — Plumb's per-function ranking remains
 informative on the other 96% of programs.
 
@@ -268,8 +279,8 @@ hard claim.
 
 `phi=0` in the default weight table. Real `phi` lowering on x86 uses
 register-allocator-inserted moves that are not free. A function
-dominated by `phi`s (some of `test_callchain` at -O2 — 7 phi nodes in
-a 30-cost function) will be slightly under-counted. The user can fix
+dominated by `phi`s (`test_branchy::parse_int` at -O2 — 7 phi nodes in
+a 28-cost function) will be slightly under-counted. The user can fix
 this by editing `config/weights.cfg` and re-running.
 
 ### 5.4 The model has no cache behaviour

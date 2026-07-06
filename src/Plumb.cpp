@@ -207,24 +207,39 @@ struct ClassifyResult {
 static ClassifyResult classifyInst(const Instruction &I) {
     ClassifyResult R{"other", false};
 
+    // NOTE: this classifier must stay in sync with the group tables in
+    // README.md / DESIGN.md §4 / IMPLEMENTATION.md §3. Every opcode listed
+    // there needs an explicit branch here — anything that falls through to
+    // "other" silently gets weight 0 and vanishes from the cost model.
     if (const BinaryOperator *BO = dyn_cast<BinaryOperator>(&I)) {
-        unsigned op = BO->getOpcode();
-        if (op == Instruction::Add  || op == Instruction::FAdd ||
-            op == Instruction::Sub  || op == Instruction::FSub)
-            R.group = "add";
-        else if (op == Instruction::Mul  || op == Instruction::FMul)
-            R.group = "mul";
-        else
-            R.group = "other";
+        switch (BO->getOpcode()) {
+            case Instruction::Add:  case Instruction::FAdd:
+            case Instruction::Sub:  case Instruction::FSub:
+            case Instruction::And:  case Instruction::Or:  case Instruction::Xor:
+            case Instruction::Shl:  case Instruction::LShr: case Instruction::AShr:
+                R.group = "add";
+                break;
+            case Instruction::Mul:  case Instruction::FMul:
+            case Instruction::UDiv: case Instruction::SDiv: case Instruction::FDiv:
+            case Instruction::URem: case Instruction::SRem: case Instruction::FRem:
+                R.group = "mul";
+                break;
+            default:
+                R.group = "other";
+        }
         return R;
     }
 
-    if (isa<LoadInst>(I)  || isa<StoreInst>(I)) { R.group = "memory";  return R; }
+    if (isa<LoadInst>(I) || isa<StoreInst>(I) ||
+        isa<AtomicCmpXchgInst>(I) || isa<AtomicRMWInst>(I) ||
+        isa<FenceInst>(I))                           { R.group = "memory";  return R; }
     if (isa<AllocaInst>(I))                      { R.group = "alloca";  return R; }
 
-    if (const CallInst *CI = dyn_cast<CallInst>(&I)) {
+    // CallBase covers both CallInst and InvokeInst — both are "call" per the
+    // documented classification, and both can be indirect (function pointer).
+    if (const CallBase *CB = dyn_cast<CallBase>(&I)) {
         R.group = "call";
-        R.isIndirectCall = (CI->getCalledFunction() == nullptr);
+        R.isIndirectCall = (CB->getCalledFunction() == nullptr);
         return R;
     }
 
@@ -453,10 +468,10 @@ struct Plumb : public FunctionPass {
                 bbInsts++;
                 totalInsts++;
 
-                // Recursion detection (direct self-call)
+                // Recursion detection (direct self-call, via call or invoke)
                 if (group == "call") {
-                    if (const CallInst *CI = dyn_cast<CallInst>(&I)) {
-                        Function *callee = CI->getCalledFunction();
+                    if (const CallBase *CB = dyn_cast<CallBase>(&I)) {
+                        Function *callee = CB->getCalledFunction();
                         if (callee && callee == &F) isRecursive = true;
                         if (loopDepth > 0) sawCallInLoop = true;
                     }
