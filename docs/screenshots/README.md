@@ -1,6 +1,14 @@
 # Demo screenshots
 
-Add screenshots here for the project demo. Recommended set:
+`validation-section.png` is committed — it's real proof the "Recommendation
+Validation" dashboard section's live mode works, embedded directly in
+`README.md`, not just a to-capture placeholder like the rest of this list.
+It's a genuine `opt -loop-vectorize` result (`main` from `test_floatmm.c`,
+live-validated, 112 → 78 cost), not the static fallback. Regenerate it by
+running `./scripts/validation_server.sh`, picking a program, clicking a
+Validate button, and screenshotting `#validationCard`.
+
+Add the rest here for the project demo. Recommended set:
 
 | Filename                | Capture |
 |---|---|

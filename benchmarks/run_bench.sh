@@ -24,20 +24,11 @@ LOG="$BENCH_DIR/run.log"
 source "$ROOT/scripts/_llvm_env.sh"
 
 # locate the built pass
-PASS_LIB=""
-for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
-            "$ROOT/build/libPlumb.so" \
-            "$ROOT/build/libPlumb.dylib"; do
-  [ -f "$cand" ] && PASS_LIB="$cand" && break
-done
+find_pass_lib
 if [ -z "$PASS_LIB" ]; then
   echo "↻ pass not built — running ./build.sh"
   "$ROOT/build.sh"
-  for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
-              "$ROOT/build/libPlumb.so" \
-              "$ROOT/build/libPlumb.dylib"; do
-    [ -f "$cand" ] && PASS_LIB="$cand" && break
-  done
+  find_pass_lib
 fi
 
 if [ ! -d "$SUITE" ]; then
@@ -149,3 +140,15 @@ echo "  failed  : $FAIL"
 echo "  elapsed : $((END - START)) s"
 echo "  results : $OUT_DIR"
 echo "  log     : $LOG"
+
+# 2 programs in this LLVM test-suite subset are known, permanent skips on
+# the LLVM 14/15/16 legacy-PM toolchain this project targets (documented in
+# EVALUATION.md §6.1) — not a regression. Anything beyond that is: fail
+# loudly and nonzero, so a toolchain/pass regression doesn't silently look
+# like success to `./benchmarks/run_bench.sh && python3 benchmarks/analyze.py`
+# (the exact one-liner this repo documents for reproducing the sweep).
+MAX_EXPECTED_FAILURES="${PLUMB_MAX_BENCH_FAILURES:-2}"
+if [ "$FAIL" -gt "$MAX_EXPECTED_FAILURES" ]; then
+  echo "  ✗ $FAIL failures exceeds the expected baseline of $MAX_EXPECTED_FAILURES — see $LOG"
+  exit 1
+fi

@@ -120,9 +120,20 @@ fi
 # ── pick clang/opt from the same prefix ─────────────────────────
 LLVM_PREFIX="$(dirname "$(dirname "$(dirname "$LLVM_DIR")")")"
 LLVM_BIN="$LLVM_PREFIX/bin"
+LLVM_RESOLVED_MAJOR="$(read_llvm_version "$LLVM_DIR")"
+LLVM_RESOLVED_MAJOR="${LLVM_RESOLVED_MAJOR%%.*}"
 
 pick_tool() {
   if [ -x "$LLVM_BIN/$1" ]; then echo "$LLVM_BIN/$1"; return; fi
+  # Try the major version actually resolved into LLVM_DIR first, so opt
+  # and clang never end up from two different LLVM installs on a system
+  # with multiple versions on PATH (e.g. llvm-14/llvm-14-dev installed
+  # without clang-14, but a newer system clang-18 also on PATH — the
+  # unversioned fallback loop below would pick clang-18 for a
+  # resolved-as-llvm-14 opt without this).
+  if [ -n "$LLVM_RESOLVED_MAJOR" ] && command -v "$1-$LLVM_RESOLVED_MAJOR" >/dev/null 2>&1; then
+    echo "$1-$LLVM_RESOLVED_MAJOR"; return
+  fi
   for s in -18 -17 -16 -15 -14 ""; do
     if command -v "$1$s" >/dev/null 2>&1; then echo "$1$s"; return; fi
   done
@@ -143,3 +154,19 @@ if [ "$PLATFORM" = macos ] && command -v xcrun >/dev/null 2>&1; then
 fi
 
 export LLVM_DIR LLVM_PREFIX LLVM_BIN CLANG OPT PLATFORM PLUGIN_EXT
+
+# ── locate the built pass library ────────────────────────────────
+# Sets PASS_LIB (empty if not found). Requires $ROOT set by the caller.
+# Every script that loads the pass (run.sh, benchmarks/run_bench.sh,
+# scripts/validate_recommendations.sh, scripts/validation_server.sh)
+# shares this search instead of repeating the candidate-path loop —
+# what differs per caller (build-if-missing vs. require-already-built,
+# die vs. warn) stays in the caller.
+find_pass_lib() {
+  PASS_LIB=""
+  for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
+              "$ROOT/build/libPlumb.so" \
+              "$ROOT/build/libPlumb.dylib"; do
+    [ -f "$cand" ] && PASS_LIB="$cand" && break
+  done
+}

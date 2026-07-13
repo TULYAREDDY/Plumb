@@ -29,7 +29,7 @@ A naive instruction count ranks two functions equal if they have the same number
 
 Every cost number traces back to `(group, count, weight, depth)` — no black-box scores.
 
-> **Real example.** On the `matmul()` from `testcases/test_floatmm.c`, raw instruction count says 78. Plumb at default weights says 335 — and pinpoints `bb.6` (the depth-3 inner accumulator) as the hot block carrying ~45% of total cost. After `-O2`, that drops to 81 (−76%), with the hotspot moving cleanly out of the inner body. [See §3.4 in EVALUATION.md](EVALUATION.md#34-test_floatmmc--depth-multiplier-in-action)
+> **Real example.** On the `matmul()` from `testcases/test_floatmm.c`, raw instruction count says 78. Plumb at default weights says 335 — and pinpoints `bb.6` (the depth-3 inner accumulator) as the hot block carrying ~45% of total cost. After `-O2`, that drops to 81 (−76%), with the hotspot moving cleanly out of the inner body. [See §3.4 in EVALUATION.md](docs/EVALUATION.md#34-test_floatmmc--depth-multiplier-in-action)
 >
 > **Validated at scale.** Across 83 programs from LLVM's official test-suite (1,165 functions, 166 runs), Plumb's median -O2 cost reduction is 55%, and its top hot function lines up with the canonical kernel name (Jacobi, FFT, `kernel_*`) on every numerical workload. [Full sweep in benchmarks/SUMMARY.md](benchmarks/SUMMARY.md)
 
@@ -86,6 +86,8 @@ Every cost number traces back to `(group, count, weight, depth)` — no black-bo
 | `RECURSIVE` | direct self-call detected |
 | `HIGH_COMPLEXITY` | cyclomatic ≥ 10 |
 
+Every tag above is implemented, not just detected: `./scripts/validate_recommendations.sh` applies the real LLVM transform (or hand-written refactor) each one implies and measures whether it actually helped — see [EVALUATION.md §6](docs/EVALUATION.md#6-recommendation-validation--implementing-what-plumb-suggests).
+
 ### Verified on
 
 - macOS (Apple Silicon, Homebrew LLVM 14)
@@ -136,7 +138,7 @@ Inside the pass itself, each function is processed through a fixed sequence of s
 
 ¹ pJ figures inspired by Horowitz, *ISSCC 2014* — order-of-magnitude only, not absolute device wattage.
 
-> **Why static depth and not block frequency?** Because every cost number must trace back to (count, weight, depth). A `BlockFrequencyInfo` multiplier is a heuristic guess; a depth integer is auditable. Full rationale in [DESIGN.md §3](DESIGN.md#3-cost-model-weight-×-static-loop-depth).
+> **Why static depth and not block frequency?** Because every cost number must trace back to (count, weight, depth). A `BlockFrequencyInfo` multiplier is a heuristic guess; a depth integer is auditable. Full rationale in [DESIGN.md §3](docs/DESIGN.md#3-cost-model-weight-×-static-loop-depth).
 
 ---
 
@@ -198,13 +200,13 @@ Six C programs, each engineered to stress a different cost class. Each is run at
 | # | Testcase | Stresses | Expected dominant group | Top-line at O0 |
 |---:|:---|:---|:---:|---:|
 | 1 | [`test_arith.c`](testcases/test_arith.c)         | mixed arithmetic + nested loops + calls          | spread       | 493 |
-| 2 | [`test_branchy.c`](testcases/test_branchy.c)     | switch + nested ifs (high cyclomatic complexity) | branch + mem | 303 |
+| 2 | [`test_branchy.c`](testcases/test_branchy.c)     | switch + nested ifs (high cyclomatic complexity) | branch + mem | 375 |
 | 3 | [`test_callchain.c`](testcases/test_callchain.c) | direct + indirect (function pointer) calls       | call         | 231 |
 | 4 | [`test_floatmm.c`](testcases/test_floatmm.c)     | triple-nested float matmul (depth 3)             | memory       | **514** |
 | 5 | [`test_memheavy.c`](testcases/test_memheavy.c)   | 5-point stencil + indirect-load reduction        | memory       | 357 |
 | 6 | [`test_recursive.c`](testcases/test_recursive.c) | self-recursion + leaf functions                  | call         | 164 |
 
-Per-testcase findings, per-function deltas, and the failure cases live in [**EVALUATION.md**](EVALUATION.md).
+Per-testcase findings, per-function deltas, and the failure cases live in [**EVALUATION.md**](docs/EVALUATION.md).
 
 ### A peek at `matmul` (test_floatmm.c, -O0)
 
@@ -230,13 +232,13 @@ The six testcases in [`testcases/`](testcases/) are designed to stress specific 
    │                                                            │
    │   Top-3 hottest at -O0:                                    │
    │     1.  Misc/himenobmtxpa  →  jacobi          (cost 10669) │
-   │     2.  Misc/oourafft       →  cftmdl          (cost  3177) │
-   │     3.  Polybench/deriche  →  kernel_deriche  (cost  1579) │
+   │     2.  Misc/oourafft       →  cftmdl          (cost  3181) │
+   │     3.  Polybench/deriche  →  kernel_deriche  (cost  1587) │
    └────────────────────────────────────────────────────────────┘
 ```
 
 Plumb's hot-function detection lines up with what an HPC engineer would call out as the kernel:
-Jacobi solvers, FFT inner loops, Polybench's `kernel_*` functions all surface at the top of the cost ranking. The full report — top-15 hottest programs, per-suite breakdown, and the 3 programs where -O2 actually *increased* reported cost (the failure mode from [EVALUATION.md §5.1](EVALUATION.md#5-failure-cases) confirmed in the wild) — lives in [**benchmarks/SUMMARY.md**](benchmarks/SUMMARY.md).
+Jacobi solvers, FFT inner loops, Polybench's `kernel_*` functions all surface at the top of the cost ranking. The full report — top-15 hottest programs, per-suite breakdown, and the 3 programs where -O2 actually *increased* reported cost (the failure mode from [EVALUATION.md §5.1](docs/EVALUATION.md#5-failure-cases) confirmed in the wild) — lives in [**benchmarks/SUMMARY.md**](benchmarks/SUMMARY.md).
 
 To reproduce:
 
@@ -251,7 +253,23 @@ python3 benchmarks/analyze.py    # regenerates SUMMARY.md
 
 ## The dashboard
 
-Open `dashboard/dashboard.html` after a run. Single self-contained HTML, no build step, CDN-loaded libs (Chart.js, Cytoscape.js, html2canvas, jsPDF).
+Open `dashboard/dashboard.html`. Single self-contained HTML, no build step, CDN-loaded libs (Chart.js, Cytoscape.js, html2canvas, jsPDF).
+
+#### Recommendation validation — live, against whatever you load
+
+```bash
+./scripts/validation_server.sh   # opens http://localhost:8420/dashboard.html
+```
+
+Pick any already-analyzed program, or upload a brand-new `.c` file the project has never seen — the dashboard compiles it, runs Plumb, and every recommendation tag it finds gets a **Validate** button. Click one and the dashboard shells out to the real `opt` (`-always-inline`, `-loop-vectorize`, `-tailcallelim`) against *that exact function*, live, and shows the real before/after. This is not replayed data: below, `main` from `test_floatmm.c` gets vectorized live and its cost actually drops 112 → 78 (−30%) — a different, better outcome than the fixed case study's `matrix_add` example, because it's a different function, measured for real.
+
+<div align="center">
+  <img src="docs/screenshots/validation-section.png" alt="Dashboard's Recommendation Validation section in live mode: a function/tag picker, and a live result card showing main getting vectorized (12 vector instructions, cost 112 to 78, -30%)" width="900" />
+</div>
+
+Opened without the server (just double-clicking the HTML file), the same section still works, but falls back to a clearly-labeled fixed case study — [EVALUATION.md §6](docs/EVALUATION.md#6-recommendation-validation--implementing-what-plumb-suggests) rendered, covering Plumb's own 3 testcases only. It never pretends to reflect a file it hasn't actually analyzed.
+
+The rest of the dashboard is the per-run analysis tooling, populated after loading a `results.json` (or automatically, once you pick/upload a program above):
 
 <table>
 <tr>
@@ -416,7 +434,7 @@ The dashboard's **Live Weight Tuner** re-derives all costs client-side from `gro
 
 ## Pass options
 
-All flags use the `plumb-` prefix to avoid clashing with LLVM's own command-line options (notably the inliner's built-in `-inline-threshold`, which would trip `CommandLineParser::addOption` at `dlopen` time without the prefix). [Full story in IMPLEMENTATION.md §8](IMPLEMENTATION.md#8-command-line-flags)
+All flags use the `plumb-` prefix to avoid clashing with LLVM's own command-line options (notably the inliner's built-in `-inline-threshold`, which would trip `CommandLineParser::addOption` at `dlopen` time without the prefix). [Full story in IMPLEMENTATION.md §8](docs/IMPLEMENTATION.md#8-command-line-flags)
 
 | Flag | Default | Purpose |
 |---|---|---|
@@ -449,9 +467,6 @@ opt -enable-new-pm=0 \
 ```
 plumb/
 ├── README.md              <- this file
-├── DESIGN.md              <- approach, alternatives, tradeoffs
-├── IMPLEMENTATION.md      <- LLVM-API specifics, build details
-├── EVALUATION.md          <- measured results across 6 testcases
 ├── LICENSE                <- MIT
 ├── build.sh               <- compiles the pass
 ├── run.sh                 <- runs analysis, opens dashboard
@@ -476,18 +491,29 @@ plumb/
 ├── dashboard/
 │   └── dashboard.html     <- interactive UI (single file, CDN libs)
 ├── scripts/
-│   └── _llvm_env.sh       <- shared LLVM toolchain detection
+│   ├── _llvm_env.sh                  <- shared LLVM toolchain detection
+│   ├── _plumb_lib.py                 <- shared IR-transform helpers (both scripts below import this)
+│   ├── validate_recommendations.sh   <- fixed case study: applies + measures all 5 tags on Plumb's own testcases
+│   ├── validate_recommendations.py   <- IR surgery + JSON analysis behind the above
+│   ├── validation_server.sh          <- live validation: local HTTP server for the dashboard
+│   └── validation_server.py          <- compiles/analyzes uploads, runs transforms on-demand
 └── docs/
+    ├── DESIGN.md          <- approach, alternatives, tradeoffs
+    ├── IMPLEMENTATION.md  <- LLVM-API specifics, build details
+    ├── EVALUATION.md      <- measured results across 6 testcases
+    ├── CHANGELOG.md       <- bugs found and fixed, each with a reproducible before/after
     ├── diagrams/          <- README diagrams (matplotlib-rendered PNGs)
     └── screenshots/       <- demo captures
 ```
 
-After running `./run.sh`, three more directories appear (all `.gitignore`d):
+After running `./run.sh`, a few more directories appear (all `.gitignore`d):
 
 ```
 build/                          compiled pass library
 ir/                             LLVM IR for every testcase x {O0,O2}
 results/                        one CSV + one JSON per (testcase, opt-level) pair
+validation/                     IR/JSON from ./scripts/validate_recommendations.sh
+uploads/                        programs analyzed live via ./scripts/validation_server.sh
 benchmarks/llvm-test-suite/     sparse clone of llvm/llvm-test-suite (~30 MB)
 benchmarks/ir/                  IR for every benchmark program
 benchmarks/results/             166 JSONs (one per program × opt-level)
@@ -500,9 +526,10 @@ benchmarks/results/             166 JSONs (one per program × opt-level)
 | Doc | What's inside | Read it for |
 |---|---|---|
 | [README.md](README.md)               | This file       | overview, quick start, dashboard tour |
-| [DESIGN.md](DESIGN.md)               | 10 sections     | approach, alternatives considered, tradeoff decisions, what's out of scope |
-| [IMPLEMENTATION.md](IMPLEMENTATION.md) | 11 sections   | LLVM API specifics, classification table, the macOS `dynamic_lookup` linker workaround, the flag-prefix collision story |
-| [EVALUATION.md](EVALUATION.md)       | 6 sections     | per-testcase findings, three-model baseline comparison, §5 four honest failure modes |
+| [docs/DESIGN.md](docs/DESIGN.md)     | 10 sections     | approach, alternatives considered, tradeoff decisions, what's out of scope |
+| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | 11 sections | LLVM API specifics, classification table, the macOS `dynamic_lookup` linker workaround, the flag-prefix collision story |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | 7 sections  | per-testcase findings, three-model baseline comparison, §5 four honest failure modes, §6 recommendation validation |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | 3 entries     | every bug found in the pass/scripts/dashboard, each with a reproducible before/after |
 | [benchmarks/SUMMARY.md](benchmarks/SUMMARY.md) | auto-gen | Plumb across 83 LLVM test-suite programs (1,165 functions, 166 runs) |
 
 ---

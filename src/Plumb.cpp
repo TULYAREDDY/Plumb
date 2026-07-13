@@ -188,6 +188,11 @@ static std::map<std::string, int> loadWeights(const std::string &path) {
             while (!key.empty() &&
                    (key.back() == ' ' || key.back() == '\r' || key.back() == '\t'))
                 key.pop_back();
+            // Weight models hardware expense, which is never negative —
+            // clamping here keeps that invariant true everywhere downstream
+            // (cost sums, percentages, and the critical-path DP all assume
+            // cost >= 0).
+            if (val < 0) val = 0;
             w[key] = val;
         }
     }
@@ -227,6 +232,16 @@ static ClassifyResult classifyInst(const Instruction &I) {
             default:
                 R.group = "other";
         }
+        return R;
+    }
+
+    // UnaryOperator is a sibling of BinaryOperator, not a subclass — FNeg
+    // (the IR form of source-level unary minus on float/double) falls
+    // through the dyn_cast<BinaryOperator> above and would silently land
+    // in "other" without this. Costed like FSub, which it replaced as the
+    // canonical lowering of `-x`.
+    if (const UnaryOperator *UO = dyn_cast<UnaryOperator>(&I)) {
+        if (UO->getOpcode() == Instruction::FNeg) R.group = "add";
         return R;
     }
 
@@ -349,10 +364,17 @@ static std::vector<BasicBlock*> computeCriticalPath(
     }
 
     std::map<BasicBlock*, long>          dp;
+    std::map<BasicBlock*, int>           pathLen;   // # blocks on this block's best path — tie-break only
     std::map<BasicBlock*, BasicBlock*>   parent;
 
     for (BasicBlock *BB : rpoOrder) {
-        long best = 0;
+        // -1 (not 0) is "no forward predecessor found yet": cost is always
+        // >= 0 (loadWeights() clamps negative weights), so a real dp value
+        // can never be negative — using 0 as this sentinel made a
+        // legitimate predecessor with dp == 0 indistinguishable from "none
+        // found", which truncated the reconstructed path to one block
+        // whenever every block's cost was 0 (e.g. an all-zero weight file).
+        long best = -1;
         BasicBlock *bestPred = nullptr;
         for (BasicBlock *Pred : predecessors(BB)) {
             // Skip back-edges: predecessor must come earlier in RPO
@@ -366,21 +388,32 @@ static std::vector<BasicBlock*> computeCriticalPath(
                 bestPred = Pred;
             }
         }
+        if (best < 0) best = 0;
         long c = 0;
         auto itC = bbCost.find(BB);
         if (itC != bbCost.end()) c = itC->second;
-        dp[BB]     = best + c;
-        parent[BB] = bestPred;
+        dp[BB]      = best + c;
+        parent[BB]  = bestPred;
+        pathLen[BB] = bestPred ? pathLen[bestPred] + 1 : 1;
     }
 
-    // Pick the "exit" with the highest dp value
+    // Pick the "exit" with the highest dp value. On an exact tie (e.g.
+    // every block costs 0 under an all-zero-weight file, so every dp is
+    // 0), prefer the longer reconstructed path over Function's raw
+    // iteration order — otherwise the report trivially "ends" at
+    // whichever tied block happens to come first in IR layout (often the
+    // entry block itself), collapsing a real multi-block worst-case
+    // trace down to a single block.
     BasicBlock *endBB = nullptr;
     long maxPath = -1;
+    int  bestLen = -1;
     for (BasicBlock &BB : F) {
         auto it = dp.find(&BB);
         if (it == dp.end()) continue;
-        if (it->second > maxPath) {
+        int len = pathLen[&BB];
+        if (it->second > maxPath || (it->second == maxPath && len > bestLen)) {
             maxPath = it->second;
+            bestLen = len;
             endBB   = &BB;
         }
     }

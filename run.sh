@@ -28,21 +28,11 @@ for arg in "$@"; do
 done
 
 # ── locate the built pass library ───────────────────────────────────────
-PASS_LIB=""
-for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
-            "$ROOT/build/libPlumb.so" \
-            "$ROOT/build/libPlumb.dylib"; do
-  [ -f "$cand" ] && PASS_LIB="$cand" && break
-done
-
+find_pass_lib
 if [ -z "$PASS_LIB" ]; then
   echo -e "${YEL}pass not built yet — running ./build.sh first…${OFF}"
   "$ROOT/build.sh"
-  for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
-              "$ROOT/build/libPlumb.so" \
-              "$ROOT/build/libPlumb.dylib"; do
-    [ -f "$cand" ] && PASS_LIB="$cand" && break
-  done
+  find_pass_lib
   [ -n "$PASS_LIB" ] || die "build did not produce a loadable pass"
 fi
 
@@ -61,18 +51,19 @@ while IFS= read -r f; do TEST_FILES+=("$f"); done < <(find "$ROOT/testcases" -ma
 
 for src in "${TEST_FILES[@]}"; do
   base=$(basename "$src" .c)
-  $CLANG "${CLANG_FLAGS[@]}" -O0 -S -emit-llvm "$src" -o "ir/${base}.O0.ll" 2>/dev/null
-  $CLANG "${CLANG_FLAGS[@]}" -O2 -S -emit-llvm "$src" -o "ir/${base}.O2.ll" 2>/dev/null
+  "$CLANG" "${CLANG_FLAGS[@]}" -O0 -S -emit-llvm "$src" -o "ir/${base}.O0.ll" 2>/dev/null
+  "$CLANG" "${CLANG_FLAGS[@]}" -O2 -S -emit-llvm "$src" -o "ir/${base}.O2.ll" 2>/dev/null
   echo -e "  ${GREEN}✓${OFF} $(basename "$src")  →  ir/${base}.{O0,O2}.ll"
 done
 
 # ── run the pass on each (testcase, opt-level) pair ─────────────────────
 banner "Running Plumb analysis"
+FAIL_COUNT=0
 for src in "${TEST_FILES[@]}"; do
   base=$(basename "$src" .c)
   for lvl in O0 O2; do
     echo -e "${B}── ${base} @ -${lvl} ───────────────────────────────${OFF}"
-    "$OPT" -enable-new-pm=0 \
+    if ! "$OPT" -enable-new-pm=0 \
         -load "$PASS_LIB" \
         -plumb \
         -plumb-weight-file="$WEIGHTS" \
@@ -81,9 +72,15 @@ for src in "${TEST_FILES[@]}"; do
         -plumb-run-label="$lvl" \
         -plumb-out-file="results/${base}.${lvl}.csv" \
         -plumb-json-file="results/${base}.${lvl}.json" \
-        -disable-output "ir/${base}.${lvl}.ll" || true
+        -disable-output "ir/${base}.${lvl}.ll"; then
+      echo -e "  ${RED}✗ Plumb failed on ${base} @ -${lvl}${OFF}" >&2
+      FAIL_COUNT=$((FAIL_COUNT + 1))
+    fi
   done
 done
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  echo -e "${RED}${FAIL_COUNT} (testcase, opt-level) pair(s) failed — results/ is incomplete, see above.${OFF}"
+fi
 
 # ── open the dashboard ──────────────────────────────────────────────────
 DEFAULT_A="results/test_floatmm.O0.json"
@@ -109,3 +106,5 @@ if [ "$OPEN_DASHBOARD" = 1 ]; then
     echo -e "${YEL}(no browser launcher found — open dashboard/dashboard.html manually)${OFF}"
   fi
 fi
+
+[ "$FAIL_COUNT" -eq 0 ] || exit 1

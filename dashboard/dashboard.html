@@ -248,6 +248,9 @@ select.func-select:focus, select.theme-select:focus{
 .chip.vec     {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
 .chip.rec     {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
 .chip.complex {background:var(--surface-2);color:var(--ink-muted);border-color:var(--hairline-strong);}
+button.chip{cursor:pointer;transition:background-color .12s ease,border-color .12s ease;}
+button.chip:hover{border-color:var(--hairline-strong);background:var(--surface-3);}
+button.chip:disabled{cursor:default;opacity:0.5;}
 
 /* ── Heatmap ── */
 .heatmap{display:flex;flex-wrap:wrap;gap:6px;}
@@ -390,6 +393,73 @@ table.ftable tr:hover td{background:var(--surface-2);}
   line-height:1.5;
 }
 
+/* ── Recommendation validation (always-visible proof section) ── */
+.validation-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;}
+.val-card{
+  background:var(--canvas);border:1px solid var(--hairline);
+  border-radius:10px;padding:18px 20px;
+}
+.val-card .val-head{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:10px;flex-wrap:wrap;
+}
+.val-card .val-tag{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-size:13px;font-weight:700;letter-spacing:0.2px;color:var(--ink);
+}
+.verdict{
+  display:inline-block;padding:3px 10px;border-radius:9999px;
+  font-size:11px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;
+  border:1px solid var(--hairline);white-space:nowrap;
+}
+.verdict.validated  {background:rgba(39,166,68,0.12);  color:#4fd67a;          border-color:rgba(39,166,68,0.4);}
+.verdict.limitation {background:var(--surface-2);       color:var(--ink-subtle); border-color:var(--hairline-strong);}
+.verdict.partial    {background:rgba(94,106,210,0.12); color:var(--primary-hover); border-color:rgba(94,106,210,0.4);}
+.val-card .val-action{font-size:13px;color:var(--ink-muted);line-height:1.5;margin-bottom:12px;}
+.val-card .val-action code{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  color:var(--primary-hover);font-size:12px;
+}
+.val-metric{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  font-size:13px;margin-bottom:7px;
+}
+.val-metric .vm-label{color:var(--ink-subtle);font-size:12px;flex:1 1 auto;min-width:170px;}
+.val-metric .vm-num{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  color:var(--ink);font-variant-numeric:tabular-nums;
+}
+.val-metric .vm-arrow{color:var(--ink-tertiary);font-size:12px;}
+.val-metric .vm-delta{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-weight:600;font-size:12px;
+}
+.val-metric .vm-delta.down{color:var(--success);}
+.val-metric .vm-delta.up{color:var(--danger);}
+.val-metric .vm-delta.flat{color:var(--ink-subtle);font-weight:500;}
+.val-card .val-note{
+  font-size:12px;color:var(--ink-tertiary);line-height:1.5;
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--hairline);
+}
+.val-repro{
+  margin-top:16px;padding:12px 16px;background:var(--surface-2);
+  border:1px solid var(--hairline);border-radius:8px;
+  font-size:12px;color:var(--ink-subtle);
+}
+.val-repro code{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  color:var(--primary-hover);
+}
+.val-func-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 0;border-bottom:1px solid var(--hairline);
+}
+.val-func-row:last-child{border-bottom:none;}
+.val-func-row .vf-name{
+  font-family:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  font-weight:500;font-size:13px;color:var(--ink);min-width:160px;
+}
+
 /* ── Comparison ── */
 .compare-toggle{
   display:inline-flex;background:var(--canvas);
@@ -486,6 +556,45 @@ footer.foot a:hover{color:var(--ink);}
       <button class="btn accent" id="exportPdf">Export PDF</button>
     </div>
   </header>
+
+  <!-- ─── RECOMMENDATION VALIDATION (always visible — proof, not just detection) ─── -->
+  <div class="card" id="validationCard">
+    <div class="card-header">
+      <div class="card-title"><span class="dot"></span>Recommendation Validation</div>
+      <div class="card-sub" id="validationSub">Checking for the live-validation server…</div>
+    </div>
+
+    <!-- LIVE MODE: validation_server.py is running — validate whatever's actually loaded -->
+    <div id="validationLive" style="display:none;">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+        <span class="card-sub">Analyzed programs:</span>
+        <select class="func-select" id="serverTestcaseSelect"><option value="">— pick one —</option></select>
+        <label class="btn file-label">
+          Analyze new program (.c)
+          <input type="file" id="uploadC" accept=".c,.cc,.cpp,.cxx" />
+        </label>
+        <span class="run-pill" id="serverStatus">● connecting…</span>
+      </div>
+      <div id="validationFuncList"></div>
+      <div class="validation-grid" id="validationResults" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- FALLBACK: no server — fixed case study on Plumb's own testcases only -->
+    <div id="validationFallback" style="display:none;">
+      <div class="val-repro" style="margin-bottom:16px;">
+        ⚠ Live-validation server isn't running, so this is <strong>not</strong> the file(s) loaded
+        above — it's Plumb's own pre-computed case study (<code>test_arith.c</code>,
+        <code>test_branchy.c</code>, <code>test_recursive.c</code>). Run
+        <code>./scripts/validation_server.sh</code> to validate live, against whatever program you
+        actually pick or upload.
+      </div>
+      <div class="validation-grid" id="validationGrid"></div>
+    </div>
+
+    <div class="val-repro">
+      Reproduce the fixed case study with one command: <code>./scripts/validate_recommendations.sh</code> — full write-up in <code>EVALUATION.md §6</code>.
+    </div>
+  </div>
 
   <!-- ─── EMPTY STATE ─── -->
   <div id="emptyState" class="card empty">
@@ -801,9 +910,13 @@ function recompute(raw, w) {
     f.totalCost        = total;
     f.criticalPathCost = Math.round((f.criticalPathCost || 0) * ratio);
     f.isHotspot        = total > hotThreshold;
-    // re-rank most-expensive group
+    // re-rank most-expensive group. Tie-break must match the pass's own
+    // std::map<string,long> iteration (alphabetical), not f.groups'
+    // fixed emission order (add,mul,memory,...) — otherwise an exact-tie
+    // function silently disagrees with the pass's own JSON on reload.
     let mx=-1, mxg=f.mostExpensiveGroup;
-    for (const g of f.groups) if (g.cost > mx) { mx = g.cost; mxg = g.group; }
+    const byGroupName = [...f.groups].sort((a, b) => a.group < b.group ? -1 : a.group > b.group ? 1 : 0);
+    for (const g of byGroupName) if (g.cost > mx) { mx = g.cost; mxg = g.group; }
     f.mostExpensiveGroup = mxg;
 
     // Rebuild recommendations to match the pass's own ordering
@@ -835,6 +948,12 @@ function findFunc(name, data) {
    REFRESH ALL VISUALISATIONS
    ═══════════════════════════════════════════════════════════════ */
 function refreshAll() {
+  // Diff mode's recommendations panel is built by renderDiffMode(), not
+  // refreshRecs() (which explicitly no-ops in diff mode) — dispatch here
+  // so every caller of refreshAll() (weight sliders, resetWeights, a new
+  // file load) stays diff-mode-correct instead of leaving stale diff
+  // cards on screen after the underlying data changes.
+  if (STATE.mode === 'diff' && STATE.workB) { renderDiffMode(); return; }
   refreshKPIs();
   refreshDonut();
   refreshRankBar();
@@ -1261,6 +1380,271 @@ function refreshRecs() {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   RECOMMENDATION VALIDATION — always-visible proof section.
+   Driven by VALIDATION_DATA (defined below, from validation/summary.json)
+   — auto-embedded by scripts/validate_recommendations.py every time the
+   validation script runs, so this section never goes stale the way a
+   hand-pasted screenshot would. Independent of STATE — renders once on
+   page load, with no results.json required.
+   ═══════════════════════════════════════════════════════════════ */
+function valDelta(before, after, lowerIsBetter = true) {
+  const d = after - before;
+  const p = before ? Math.round(d / before * 100) : 0;
+  const cls = d === 0 ? 'flat' : ((d < 0) === lowerIsBetter ? 'down' : 'up');
+  const sign = d > 0 ? '+' : '';
+  return `<span class="vm-delta ${cls}">${sign}${d} (${sign}${p}%)</span>`;
+}
+function valMetric(label, before, after, lowerIsBetter = true) {
+  return `<div class="val-metric">
+    <span class="vm-label">${label}</span>
+    <span class="vm-num">${before}</span>
+    <span class="vm-arrow">→</span>
+    <span class="vm-num">${after}</span>
+    ${valDelta(before, after, lowerIsBetter)}
+  </div>`;
+}
+
+function renderValidationSection() {
+  const grid = document.getElementById('validationGrid');
+  if (!grid || typeof VALIDATION_DATA === 'undefined' || !VALIDATION_DATA) return;
+  const V = VALIDATION_DATA;
+  const cards = [];
+
+  const sq = V.inline_candidate.square, tr = V.inline_candidate.arith_trio;
+  cards.push(`
+    <div class="val-card">
+      <div class="val-head"><span class="val-tag">INLINE_CANDIDATE</span><span class="verdict validated">Validated</span></div>
+      <div class="val-action">Force-inlined the flagged function(s) with LLVM's real <code>-always-inline</code> — measured with and without the cleanup passes that always travel alongside <code>-O2</code>'s inliner.</div>
+      ${valMetric('square (test_recursive.c)', sq.before_total, sq.after_cleaned_total)}
+      ${valMetric('compute/classify/scale (test_arith.c)', tr.before_total, tr.after_cleaned_total)}
+      <div class="val-note">Inlining alone, with no cleanup, made cost <em>worse</em> — ${sq.before_total}→${sq.after_raw_total} and ${tr.before_total}→${tr.after_raw_total} — proof the win comes from the cleanup passes, not the inlining alone.</div>
+    </div>`);
+
+  const ma = V.vectorizable.matrix_add, pi = V.vectorizable.parse_int;
+  cards.push(`
+    <div class="val-card">
+      <div class="val-head"><span class="val-tag">VECTORIZABLE</span><span class="verdict validated">Validated</span></div>
+      <div class="val-action">Ran LLVM's real <code>-loop-vectorize</code> on the flagged true positive and the documented false positive.</div>
+      <div class="val-metric"><span class="vm-label">matrix_add — vector instructions</span><span class="vm-num">${ma.vector_instructions}</span><span class="vm-delta down">VECTORIZED</span></div>
+      <div class="val-metric"><span class="vm-label">parse_int — vector instructions</span><span class="vm-num">${pi.vector_instructions}</span><span class="vm-delta flat">declined by real vectorizer</span></div>
+      <div class="val-note">The real vectorizer agrees with both calls Plumb makes — including the false positive Plumb already owns up to in §5.2.</div>
+    </div>`);
+
+  const fib = V.recursive.fib, fact = V.recursive.fact;
+  cards.push(`
+    <div class="val-card">
+      <div class="val-head"><span class="val-tag">RECURSIVE</span><span class="verdict limitation">Honest limitation</span></div>
+      <div class="val-action">Ran <code>-tailcallelim</code> — the standard LLVM pass for removing recursive call overhead — on <code>fib</code>/<code>fact</code>.</div>
+      <div class="val-metric"><span class="vm-label">fib self-calls</span><span class="vm-num">${fib.before_calls}</span><span class="vm-arrow">→</span><span class="vm-num">${fib.after_calls}</span><span class="vm-delta flat">unchanged</span></div>
+      <div class="val-metric"><span class="vm-label">fact self-calls</span><span class="vm-num">${fact.before_calls}</span><span class="vm-arrow">→</span><span class="vm-num">${fact.after_calls}</span><span class="vm-delta flat">unchanged</span></div>
+      <div class="val-note">No standard pass removes this cost — confirms RECURSIVE flags something genuinely persistent, unlike INLINE_CANDIDATE.</div>
+    </div>`);
+
+  const h = V.hotspot;
+  cards.push(`
+    <div class="val-card">
+      <div class="val-head"><span class="val-tag">HOTSPOT</span><span class="verdict partial">Partial</span></div>
+      <div class="val-action">Cross-checked every HOTSPOT-flagged function at -O0 against its own -O2 outcome, across all 12 local runs.</div>
+      <div class="val-metric"><span class="vm-label">resolved by -O2 alone</span><span class="vm-num">${h.resolved.length}/${h.total}</span></div>
+      <div class="val-metric"><span class="vm-label">persist — need more than a flag</span><span class="vm-num">${h.persisted.length}/${h.total}</span></div>
+      <div class="val-note">A HOTSPOT tag is worth checking twice — a little under half resolve with -O2 alone; the rest need the fixes above or a human look.</div>
+    </div>`);
+
+  const hc = V.high_complexity;
+  cards.push(`
+    <div class="val-card">
+      <div class="val-head"><span class="val-tag">HIGH_COMPLEXITY</span><span class="verdict validated">Validated</span></div>
+      <div class="val-action">Hand-wrote <code>categorize_v2</code>, a lookup-table refactor — the one tag with no corresponding LLVM pass — then verified behavioral equivalence at runtime across all 256 byte values.</div>
+      ${valMetric('cyclomatic complexity', hc.categorize_cc, hc.categorize_v2_cc)}
+      ${valMetric('cost', hc.categorize_cost, hc.categorize_v2_cost)}
+      <div class="val-note">categorize_v2 is now cheap enough to also earn INLINE_CANDIDATE — a tag categorize never gets.</div>
+    </div>`);
+
+  grid.innerHTML = cards.join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIVE VALIDATION — talks to scripts/validation_server.py over HTTP.
+   Only active when the dashboard is served BY that server (fetch to
+   /api/testcases succeeds); when opened as a plain file, or the server
+   isn't running, falls back to renderValidationSection()'s fixed case
+   study above, clearly labeled as such. This is what makes "Validate"
+   apply to whatever program you actually pick or upload, not just
+   Plumb's own 3 testcases.
+   ═══════════════════════════════════════════════════════════════ */
+const SERVER = { available: false, testcase: null, level: null };
+
+async function initServerMode() {
+  try {
+    const res = await fetch('/api/testcases');
+    if (!res.ok) throw new Error('server responded ' + res.status);
+    const data = await res.json();
+    SERVER.available = true;
+    document.getElementById('validationLive').style.display = '';
+    document.getElementById('validationFallback').style.display = 'none';
+    document.getElementById('validationSub').textContent =
+      'Live — pick an analyzed program or upload a new one below, then validate any of its tags for real.';
+    document.getElementById('serverStatus').textContent = '● connected';
+    populateServerPicker(data.testcases);
+  } catch (e) {
+    SERVER.available = false;
+    document.getElementById('validationLive').style.display = 'none';
+    document.getElementById('validationFallback').style.display = '';
+    document.getElementById('validationSub').textContent =
+      'Fixed case study — live-validation server not running (see banner below).';
+    renderValidationSection();
+  }
+}
+
+function populateServerPicker(testcases) {
+  const sel = document.getElementById('serverTestcaseSelect');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— pick one —</option>';
+  for (const tc of testcases) {
+    const opt = document.createElement('option');
+    opt.value = JSON.stringify({ testcase: tc.testcase, level: tc.level });
+    opt.textContent = `${tc.testcase} (${tc.level})` + (tc.source === 'upload' ? ' · uploaded' : '');
+    sel.appendChild(opt);
+  }
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+document.getElementById('serverTestcaseSelect').addEventListener('change', async e => {
+  if (!e.target.value) return;
+  const { testcase, level } = JSON.parse(e.target.value);
+  await loadServerTestcase(testcase, level);
+});
+
+document.getElementById('uploadC').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('serverStatus');
+  status.textContent = '● compiling…';
+  try {
+    const source = await file.text();
+    const res = await fetch('/api/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, source })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    status.textContent = '● connected';
+    const list = await fetch('/api/testcases').then(r => r.json());
+    populateServerPicker(list.testcases);
+    document.getElementById('serverTestcaseSelect').value =
+      JSON.stringify({ testcase: data.testcase, level: 'O0' });
+    await loadServerTestcase(data.testcase, 'O0');
+  } catch (err) {
+    status.textContent = '● error';
+    alert('Upload/compile failed: ' + err.message);
+  } finally {
+    e.target.value = '';
+  }
+});
+
+async function loadServerTestcase(testcase, level) {
+  const res = await fetch(`/api/results?testcase=${encodeURIComponent(testcase)}&level=${encodeURIComponent(level)}`);
+  const json = await res.json();
+  if (json.error) { alert(json.error); return; }
+  SERVER.testcase = testcase; SERVER.level = level;
+  // Feed it through the EXACT same path as a manual "Load JSON (A)" upload,
+  // so the whole dashboard (KPIs, charts, heatmap, CFG, table) reacts to
+  // whatever was picked/uploaded too — not just this validation panel.
+  validate(json);
+  STATE.rawA = json;
+  onDataLoaded();
+  renderValidationFuncList(json.functions);
+}
+
+function renderValidationFuncList(functions) {
+  const box = document.getElementById('validationFuncList');
+  box.innerHTML = functions.map(f => {
+    const chips = (f.recommendations || []).map(tag =>
+      `<button class="chip ${recClass(tag)}" onclick="runLiveValidation('${f.name}','${tag}')">${tag} ▶</button>`
+    ).join(' ');
+    return `<div class="val-func-row">
+      <span class="vf-name">${f.name}</span>
+      ${chips || '<span class="chip">no flags</span>'}
+    </div>`;
+  }).join('') || '<div class="card-sub">no functions</div>';
+}
+
+async function runLiveValidation(functionName, tag) {
+  const resultsBox = document.getElementById('validationResults');
+  const cardId = `live-${functionName}-${tag}-${Date.now()}`.replace(/[^\w-]/g, '');
+  const placeholder = document.createElement('div');
+  placeholder.className = 'val-card';
+  placeholder.id = cardId;
+  placeholder.innerHTML = `
+    <div class="val-head"><span class="val-tag">${tag} · ${functionName}</span><span class="verdict limitation">Running…</span></div>
+    <div class="val-action">Shelling out to the real <code>opt</code> now — give it a second.</div>`;
+  resultsBox.prepend(placeholder);
+
+  try {
+    const res = await fetch('/api/validate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ testcase: SERVER.testcase, level: SERVER.level, function: functionName, tag })
+    });
+    const data = await res.json();
+    document.getElementById(cardId).outerHTML = renderLiveResultCard(data);
+  } catch (e) {
+    document.getElementById(cardId).outerHTML = renderLiveResultCard({ error: e.message, tag, function: functionName });
+  }
+}
+
+function renderLiveResultCard(d) {
+  if (d.error) {
+    return `<div class="val-card"><div class="val-head"><span class="val-tag">${d.tag || ''} · ${d.function || ''}</span><span class="verdict up">Error</span></div><div class="val-action">${d.error}</div></div>`;
+  }
+  if (d.tag === 'HIGH_COMPLEXITY') {
+    return `<div class="val-card">
+      <div class="val-head"><span class="val-tag">HIGH_COMPLEXITY · ${d.function}</span><span class="verdict limitation">Not automatable</span></div>
+      <div class="val-action">${d.message}</div>
+    </div>`;
+  }
+  if (d.tag === 'INLINE_CANDIDATE') {
+    const changed = (d.changed_functions || []).slice(0, 6)
+      .map(c => `<div class="val-metric"><span class="vm-label">${c.name}</span><span class="vm-num">${c.before ?? 'gone'}</span><span class="vm-arrow">→</span><span class="vm-num">${c.after ?? 'gone'}</span></div>`)
+      .join('');
+    return `<div class="val-card">
+      <div class="val-head"><span class="val-tag">INLINE_CANDIDATE · ${d.function}</span><span class="verdict validated">Live result</span></div>
+      <div class="val-action">Force-inlined <code>${d.function}</code> with real <code>-always-inline</code>, measured with and without cleanup passes.</div>
+      ${valMetric('module cost — raw inline only', d.before_total, d.after_raw_total)}
+      ${valMetric('module cost — inline + cleanup', d.before_total, d.after_cleaned_total)}
+      <div class="val-note">${d.remaining_calls} remaining call site(s) to ${d.function}. Functions whose cost changed:</div>
+      ${changed}
+    </div>`;
+  }
+  if (d.tag === 'VECTORIZABLE') {
+    const verdictCls = d.verdict === 'vectorized' ? 'validated' : 'limitation';
+    return `<div class="val-card">
+      <div class="val-head"><span class="val-tag">VECTORIZABLE · ${d.function}</span><span class="verdict ${verdictCls}">Live result</span></div>
+      <div class="val-action">Ran real <code>-loop-vectorize</code> on <code>${d.function}</code>.</div>
+      <div class="val-metric"><span class="vm-label">vector instructions</span><span class="vm-num">${d.vector_instructions}</span>
+        <span class="vm-delta ${d.verdict === 'vectorized' ? 'down' : 'flat'}">${d.verdict === 'vectorized' ? 'VECTORIZED' : 'declined by real vectorizer'}</span></div>
+      ${valMetric('cost', d.before_cost, d.after_cost)}
+    </div>`;
+  }
+  if (d.tag === 'RECURSIVE') {
+    return `<div class="val-card">
+      <div class="val-head"><span class="val-tag">RECURSIVE · ${d.function}</span><span class="verdict limitation">Live result</span></div>
+      <div class="val-action">Ran real <code>-tailcallelim</code> on <code>${d.function}</code>.</div>
+      <div class="val-metric"><span class="vm-label">self-calls</span><span class="vm-num">${d.before_calls}</span><span class="vm-arrow">→</span><span class="vm-num">${d.after_calls}</span>
+        <span class="vm-delta flat">${d.verdict}</span></div>
+    </div>`;
+  }
+  if (d.tag === 'HOTSPOT') {
+    return `<div class="val-card">
+      <div class="val-head"><span class="val-tag">HOTSPOT · ${d.function}</span><span class="verdict ${d.resolved ? 'validated' : 'partial'}">Live result</span></div>
+      <div class="val-action">Compared ${d.function} at ${d.this_level} against its own ${d.other_level} outcome.</div>
+      <div class="val-metric"><span class="vm-label">${d.this_level} → ${d.other_level} cost</span><span class="vm-num">${d.this_cost}</span><span class="vm-arrow">→</span><span class="vm-num">${d.other_cost}</span></div>
+      <div class="val-note">${d.resolved ? 'Resolved by the other optimization level alone.' : 'Still HOTSPOT at the other level — needs more than a compiler flag.'}</div>
+    </div>`;
+  }
+  return `<div class="val-card">Unrecognized result shape.</div>`;
+}
+
 /* ── FUNCTION TABLE ── */
 function bindTableSort() {
   document.querySelectorAll('#ftable th[data-key]').forEach(th => {
@@ -1500,6 +1884,146 @@ for (const f of DEMO_B.functions) {
     b.instructions = Math.round(b.instructions * factor);
   }
 }
+
+/* VALIDATION_DATA_BEGIN — auto-generated by scripts/validate_recommendations.py
+   from validation/summary.json. DO NOT HAND-EDIT this block — re-run
+   ./scripts/validate_recommendations.sh to refresh it. */
+const VALIDATION_DATA = {
+  "inline_candidate": {
+    "square": {
+      "before_total": 164,
+      "after_raw_total": 183,
+      "after_cleaned_total": 149
+    },
+    "arith_trio": {
+      "before_total": 493,
+      "after_raw_total": 753,
+      "after_cleaned_total": 363
+    }
+  },
+  "vectorizable": {
+    "matrix_add": {
+      "vector_instructions": 14,
+      "before_cost": 193,
+      "after_cost": 202
+    },
+    "parse_int": {
+      "vector_instructions": 0,
+      "before_cost": 134,
+      "after_cost": 57
+    }
+  },
+  "recursive": {
+    "fib": {
+      "before_calls": 2,
+      "after_calls": 2
+    },
+    "fact": {
+      "before_calls": 1,
+      "after_calls": 1
+    }
+  },
+  "hotspot": {
+    "resolved": [
+      [
+        "test_arith::compute",
+        "60 -> 3"
+      ],
+      [
+        "test_arith::classify",
+        "39 -> 6"
+      ],
+      [
+        "test_arith::scale",
+        "32 -> 4"
+      ],
+      [
+        "test_arith::main",
+        "86 -> 25"
+      ],
+      [
+        "test_branchy::categorize",
+        "61 -> 10"
+      ],
+      [
+        "test_branchy::parse_int",
+        "134 -> 28"
+      ],
+      [
+        "test_branchy::check_categorize_equivalence",
+        "inlined away entirely"
+      ],
+      [
+        "test_callchain::main",
+        "52 -> 5"
+      ],
+      [
+        "test_recursive::fib",
+        "44 -> 14"
+      ]
+    ],
+    "persisted": [
+      [
+        "test_arith::matrix_add",
+        "193 -> 115"
+      ],
+      [
+        "test_arith::process",
+        "83 -> 48"
+      ],
+      [
+        "test_branchy::main",
+        "113 -> 121"
+      ],
+      [
+        "test_callchain::run_pipeline",
+        "110 -> 32"
+      ],
+      [
+        "test_floatmm::matmul",
+        "335 -> 81"
+      ],
+      [
+        "test_floatmm::scale_rows",
+        "67 -> 55"
+      ],
+      [
+        "test_floatmm::main",
+        "112 -> 378"
+      ],
+      [
+        "test_memheavy::stencil",
+        "212 -> 334"
+      ],
+      [
+        "test_memheavy::reduce_indirect",
+        "65 -> 41"
+      ],
+      [
+        "test_memheavy::main",
+        "80 -> 435"
+      ],
+      [
+        "test_recursive::fact",
+        "36 -> 34"
+      ],
+      [
+        "test_recursive::main",
+        "72 -> 59"
+      ]
+    ],
+    "total": 21
+  },
+  "high_complexity": {
+    "categorize_cc": 23,
+    "categorize_cost": 61,
+    "categorize_v2_cc": 1,
+    "categorize_v2_cost": 12
+  }
+};
+/* VALIDATION_DATA_END */
+
+initServerMode();
 </script>
 </body>
 </html>

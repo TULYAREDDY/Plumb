@@ -17,7 +17,7 @@ This file aggregates Plumb's output across **83 programs** from the official [LL
 | Biggest cost reduction          | `Shootout__nestedloop` (-95.3%) |
 | Biggest cost increase           | `Shootout__matrix` (+112.8%) |
 
-¹ The -O2 cost increase is the inliner-inflation failure mode documented in [EVALUATION.md §5.1](../EVALUATION.md#5-failure-cases). At scale, it affects **4%** of programs.
+¹ The -O2 cost increase is the inliner-inflation failure mode documented in [EVALUATION.md §5.1](../docs/EVALUATION.md#5-failure-cases). At scale, it affects **4%** of programs.
 
 ## Cost-class dominance (-O0)
 
@@ -32,26 +32,26 @@ For each program at `-O0`, which instruction group dominated its weighted cost?
 
 | Suite | Programs | Σ cost (O0) | mean cost / program |
 |---|---:|---:|---:|
-| Misc | 28 | 51,031 | 1,823 |
-| Polybench | 30 | 77,922 | 2,597 |
+| Misc | 28 | 51,100 | 1,825 |
+| Polybench | 30 | 77,958 | 2,599 |
 | Shootout | 14 | 6,045 | 432 |
-| Stanford | 11 | 8,635 | 785 |
+| Stanford | 11 | 8,636 | 785 |
 
 ## Top 15 hottest programs (by total weighted cost @ -O0)
 
 | Rank | Program | Cost (O0) | Cost (O2) | Δ% | Hottest function |
 |---:|---|---:|---:|---:|---|
 | 1 | `Misc__himenobmtxpa` | 12,318 | 2,811 | -77% | `jacobi` (10669) |
-| 2 | `Misc__oourafft` | 11,787 | 3,066 | -74% | `cftmdl` (3177) |
-| 3 | `Polybench__medley__deriche__deriche` | 4,524 | 1,361 | -70% | `kernel_deriche` (1579) |
+| 2 | `Misc__oourafft` | 11,830 | 3,104 | -74% | `cftmdl` (3181) |
+| 3 | `Polybench__medley__deriche__deriche` | 4,540 | 1,361 | -70% | `kernel_deriche` (1587) |
 | 4 | `Misc__ReedSolomon` | 3,987 | 2,342 | -41% | `decode_rs` (2698) |
-| 5 | `Misc__whetstone` | 3,843 | 1,192 | -69% | `main` (3500) |
+| 5 | `Misc__whetstone` | 3,850 | 1,192 | -69% | `main` (3506) |
 | 6 | `Polybench__medley__nussinov__nussinov` | 3,811 | 817 | -79% | `kernel_nussinov` (1272) |
 | 7 | `Polybench__linear-algebra__kernels__3mm__3mm` | 3,721 | 1,167 | -69% | `kernel_3mm` (921) |
 | 8 | `Polybench__stencils__fdtd-2d__fdtd-2d` | 3,665 | 2,032 | -45% | `kernel_fdtd_2d` (1068) |
-| 9 | `Misc__flops` | 3,656 | 2,583 | -29% | `main` (3604) |
+| 9 | `Misc__flops` | 3,663 | 2,590 | -29% | `main` (3611) |
 | 10 | `Polybench__stencils__heat-3d__heat-3d` | 3,472 | 1,720 | -50% | `kernel_heat_3d` (2210) |
-| 11 | `Polybench__stencils__adi__adi` | 3,395 | 1,278 | -62% | `kernel_adi` (2086) |
+| 11 | `Polybench__stencils__adi__adi` | 3,409 | 1,278 | -63% | `kernel_adi` (2100) |
 | 12 | `Polybench__linear-algebra__solvers__ludcmp__ludcmp` | 3,387 | 1,217 | -64% | `kernel_ludcmp` (955) |
 | 13 | `Misc__ffbench` | 3,222 | 837 | -74% | `fourn` (2494) |
 | 14 | `Polybench__linear-algebra__kernels__2mm__2mm` | 3,179 | 1,397 | -56% | `kernel_2mm` (658) |
@@ -59,7 +59,7 @@ For each program at `-O0`, which instruction group dominated its weighted cost?
 
 ## Programs where -O2 *increased* cost
 
-This is the static-model blind spot we documented in [EVALUATION.md §5.1](../EVALUATION.md#5-failure-cases) — -O2 inlining + unrolling pulls callees into the caller, so the per-function cost goes up even though wall-clock goes down. At scale this happens in 3 of 83 programs (4%).
+This is the static-model blind spot we documented in [EVALUATION.md §5.1](../docs/EVALUATION.md#5-failure-cases) — -O2 inlining + unrolling pulls callees into the caller, so the per-function cost goes up even though wall-clock goes down. At scale this happens in 3 of 83 programs (4%).
 
 | Program | O0 | O2 | Δ |
 |---|---:|---:|---:|

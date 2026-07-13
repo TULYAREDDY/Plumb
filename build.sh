@@ -27,12 +27,7 @@ fi
 JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)
 make -j"$JOBS"
 
-PASS_LIB=""
-for cand in "$ROOT/build/libPlumb.${PLUGIN_EXT}" \
-            "$ROOT/build/libPlumb.so" \
-            "$ROOT/build/libPlumb.dylib"; do
-  [ -f "$cand" ] && PASS_LIB="$cand" && break
-done
+find_pass_lib
 [ -n "$PASS_LIB" ] || die "build failed: pass library not produced"
 
 cd "$ROOT"

@@ -43,7 +43,7 @@ python3 benchmarks/analyze.py    # regenerate SUMMARY.md
 A static cost model that hasn't been run on real code is a hypothesis, not a tool. The 83-program sweep is what lets Plumb claim:
 
 - it agrees with intuition on canonical kernels (Jacobi, FFT, Polybench `kernel_*` functions all surface as hot)
-- the documented failure modes in [EVALUATION.md §5](../EVALUATION.md#5-failure-cases) actually occur in the wild, and at what rate (e.g. -O2-inflation: 4% of programs)
-- median cost reduction at -O2 across 83 programs is 56%, with a long tail of 70-95% reductions on tight numerical kernels
+- the documented failure modes in [EVALUATION.md §5](../docs/EVALUATION.md#5-failure-cases) actually occur in the wild, and at what rate (e.g. -O2-inflation: 4% of programs)
+- median cost reduction at -O2 across 83 programs is 54.7%, with a long tail of 70-95% reductions on tight numerical kernels
 
 All numbers in `SUMMARY.md` are produced from the JSON in `results/` — re-running the harness regenerates the report end-to-end.

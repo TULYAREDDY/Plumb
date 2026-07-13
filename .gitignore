@@ -33,6 +33,8 @@ build.ninja
 # conflicts in the JSON every time a weight is tweaked.
 ir/
 results/
+validation/
+uploads/
 *.json.tmp
 *.csv.tmp
 

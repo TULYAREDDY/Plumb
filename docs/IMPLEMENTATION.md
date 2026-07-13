@@ -146,12 +146,16 @@ Direct self-call detection during the per-instruction pass:
 
 ```cpp
 if (group == "call") {
-    if (const CallInst *CI = dyn_cast<CallInst>(&I)) {
-        Function *callee = CI->getCalledFunction();
+    if (const CallBase *CB = dyn_cast<CallBase>(&I)) {
+        Function *callee = CB->getCalledFunction();
         if (callee && callee == &F) isRecursive = true;
     }
 }
 ```
+
+`CallBase` (not `CallInst`) so a self-recursive `invoke` — a direct call
+in a function with exception-handling landingpads — is detected too,
+same as the classifier fix in §3.
 
 Indirect recursion (`A → B → A` where one edge is a function pointer)
 is **not** detected; this would require interprocedural analysis we've

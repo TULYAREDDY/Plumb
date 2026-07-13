@@ -3,7 +3,8 @@
 This document explains the **approach**, the **alternatives considered**,
 and the **tradeoffs** behind every major design decision. The actual
 LLVM-API plumbing lives in `IMPLEMENTATION.md`; the measured behaviour
-across testcases lives in `EVALUATION.md`.
+across testcases lives in `EVALUATION.md`; bugs found and fixed along
+the way live in `CHANGELOG.md`.
 
 ---
 
@@ -170,6 +171,11 @@ that would require interprocedural analysis (e.g. "is recursive
 indirectly via a call cycle") because the explainability cost is high
 and the value is low for this scope.
 
+Detecting isn't the same as being right: each of these five tags is
+implemented and measured — the real LLVM transform it implies (or a
+hand-written refactor, for `HIGH_COMPLEXITY`) applied to the flagged
+function and re-measured — in `EVALUATION.md` §6.
+
 ---
 
 ## 7. Output formats: terminal + CSV + JSON
@@ -215,6 +221,30 @@ browser-cached. For air-gapped lab grading, the four CDN files can be
 downloaded once and the `<script src=…>` tags rewritten — but this is
 a one-line edit per lib, not a structural concern.
 
+### Addendum: an *optional* local server for live validation
+
+`dashboard.html` still opens directly (`file://`, no server) and
+works exactly as designed above — that constraint hasn't moved. What's
+new is `scripts/validation_server.py`: a small local HTTP server
+(stdlib `http.server`, no new dependency) that the dashboard talks to
+*if present*, to run real LLVM transforms against whatever program you
+pick or upload, live. Two deliberate boundaries keep this an addendum
+rather than a rewrite of the decision above:
+
+* **Detected, not required.** The dashboard `fetch()`s `/api/testcases`
+  on load; if that fails (opened as a plain file, or the server isn't
+  running), it falls back to a fixed, clearly-labeled reference case
+  study instead of a broken or silently-wrong UI. See
+  `EVALUATION.md` §6 for why a fixed case study exists at all — this
+  server is the live counterpart to it, not a replacement.
+* **Read-only about the pass itself.** The server only ever invokes
+  `opt`/`clang` as external processes on IR it already has or just
+  compiled — it doesn't modify `src/Plumb.cpp` or reinterpret its
+  output; it's a thin HTTP wrapper around the exact same transform
+  logic `scripts/validate_recommendations.py` uses (shared via
+  `scripts/_plumb_lib.py`), just parameterized per-request instead of
+  fixed at three testcases.
+
 ---
 
 ## 9. Build and toolchain
@@ -250,8 +280,18 @@ To keep the project focussed:
   call cost is a flat 5 plus the surcharge, not the callee's cost.
   This is why a tiny `main()` can rank below `matmul()` — `main()`
   *calls into* matmul but doesn't pay for it.
-* **No multi-threading cost.** Locks, atomics, fences fall in `other`.
+* **No multi-threading cost.** Atomics and fences are costed as plain
+  `memory` — no extra weight for contention, ordering, or lock overhead.
 * **No cache model.** Memory cost is a single weight, not a hierarchy.
+* **No SIMD-width term.** A vectorized instruction is costed the same
+  as its scalar equivalent — confirmed to matter in practice in
+  `EVALUATION.md` §6.2.
+* **No `ScalarEvolution`-based dependency analysis.** `VECTORIZABLE`'s
+  rule ("loop exists AND no calls inside it") is a structural signal,
+  not a loop-carried-dependency check — SCEV would catch the
+  `parse_int` false positive from `EVALUATION.md` §5.2 but adds an
+  analysis dependency for a rule this project keeps deliberately
+  first-order (§6).
 
 These would all be valuable extensions and are called out in
-`EVALUATION.md` §6 as next steps.
+`EVALUATION.md` §7 as next steps.

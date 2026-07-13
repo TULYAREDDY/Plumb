@@ -139,7 +139,7 @@ def main():
         w(f"| Biggest cost reduction          | `{biggest_drop['prog']}` ({biggest_drop['pct']:.1f}%) |\n")
         w(f"| Biggest cost increase           | `{biggest_rise['prog']}` (+{biggest_rise['pct']:.1f}%) |\n\n")
         w(f"¹ The -O2 cost increase is the inliner-inflation failure mode "
-          f"documented in [EVALUATION.md §5.1](../EVALUATION.md#5-failure-cases). "
+          f"documented in [EVALUATION.md §5.1](../docs/EVALUATION.md#5-failure-cases). "
           f"At scale, it affects "
           f"**{len(regressions)/len(deltas)*100:.0f}%** of programs.\n\n")
 
@@ -179,7 +179,7 @@ def main():
 
         w(f"## Programs where -O2 *increased* cost\n\n")
         w(f"This is the static-model blind spot we documented in "
-          f"[EVALUATION.md §5.1](../EVALUATION.md#5-failure-cases) — "
+          f"[EVALUATION.md §5.1](../docs/EVALUATION.md#5-failure-cases) — "
           f"-O2 inlining + unrolling pulls callees into the caller, so "
           f"the per-function cost goes up even though wall-clock goes "
           f"down. At scale this happens in "
