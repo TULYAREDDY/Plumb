@@ -261,10 +261,10 @@ Open `dashboard/dashboard.html`. Single self-contained HTML, no build step, CDN-
 ./scripts/validation_server.sh   # opens http://localhost:8420/dashboard.html
 ```
 
-Pick any already-analyzed program, or upload a brand-new `.c` file the project has never seen — the dashboard compiles it, runs Plumb, and every recommendation tag it finds gets a **Validate** button. Click one and the dashboard shells out to the real `opt` (`-always-inline`, `-loop-vectorize`, `-tailcallelim`) against *that exact function*, live, and shows the real before/after. This is not replayed data: below, `main` from `test_floatmm.c` gets vectorized live and its cost actually drops 112 → 78 (−30%) — a different, better outcome than the fixed case study's `matrix_add` example, because it's a different function, measured for real.
+Pick any already-analyzed program from the header, or upload a brand-new `.c` file the project has never seen — the dashboard compiles it, runs Plumb, and every recommendation tag already shown in "Optimisation Recommendations" grows a **▶ Validate** button right on the chip. Click one and the dashboard shells out to the real `opt` (`-always-inline`, `-loop-vectorize`, `-tailcallelim`) against *that exact function*, live, and the result lands in "Recommendation Validation" right below. This is not replayed data: below, `main` from `test_floatmm.c` gets vectorized live and its cost actually drops 112 → 78 (−30%) — a different, better outcome than the fixed case study's `matrix_add` example, because it's a different function, measured for real.
 
 <div align="center">
-  <img src="docs/screenshots/validation-section.png" alt="Dashboard's Recommendation Validation section in live mode: a function/tag picker, and a live result card showing main getting vectorized (12 vector instructions, cost 112 to 78, -30%)" width="900" />
+  <img src="docs/screenshots/validation-section.png" alt="Dashboard's Optimisation Recommendations cards with clickable Validate buttons on each tag, and the Recommendation Validation section below showing a live result: main getting vectorized (12 vector instructions, cost 112 to 78, -30%)" width="900" />
 </div>
 
 Opened without the server (just double-clicking the HTML file), the same section still works, but falls back to a clearly-labeled fixed case study — [EVALUATION.md §6](docs/EVALUATION.md#6-recommendation-validation--implementing-what-plumb-suggests) rendered, covering Plumb's own 3 testcases only. It never pretends to reflect a file it hasn't actually analyzed.

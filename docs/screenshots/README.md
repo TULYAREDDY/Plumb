@@ -6,7 +6,8 @@ Validation" dashboard section's live mode works, embedded directly in
 It's a genuine `opt -loop-vectorize` result (`main` from `test_floatmm.c`,
 live-validated, 112 → 78 cost), not the static fallback. Regenerate it by
 running `./scripts/validation_server.sh`, picking a program, clicking a
-Validate button, and screenshotting `#validationCard`.
+Validate button on a tag in "Optimisation Recommendations", and
+screenshotting from that card down through `#validationCard`.
 
 Add the rest here for the project demo. Recommended set:
 

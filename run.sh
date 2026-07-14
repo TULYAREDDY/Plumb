@@ -82,6 +82,10 @@ if [ "$FAIL_COUNT" -gt 0 ]; then
   echo -e "${RED}${FAIL_COUNT} (testcase, opt-level) pair(s) failed — results/ is incomplete, see above.${OFF}"
 fi
 
+# ── keep the dashboard's built-in demo data honest (real output, not
+#    hand-typed numbers) — same reproducibility bar as VALIDATION_DATA ──
+python3 "$ROOT/scripts/_embed_demo_data.py" "$ROOT"
+
 # ── open the dashboard ──────────────────────────────────────────────────
 DEFAULT_A="results/test_floatmm.O0.json"
 DEFAULT_B="results/test_floatmm.O2.json"

@@ -114,6 +114,7 @@ header.topbar{
   letter-spacing:0;
 }
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.toolbar-sep{width:1px;height:22px;background:var(--hairline-strong);margin:0 4px;}
 
 /* Buttons — Linear specs: 8px 14px padding, 8px radius, 14px/500 type */
 .btn{
@@ -553,48 +554,21 @@ footer.foot a:hover{color:var(--ink);}
         <input type="file" id="fileB" accept=".json" />
       </label>
       <button class="btn ghost"  id="loadDemo">Demo Data</button>
+
+      <!-- live-mode controls: only shown once validation_server.py is detected -->
+      <span class="toolbar-sep" id="liveSep" style="display:none;"></span>
+      <select class="func-select" id="serverTestcaseSelect" style="display:none;">
+        <option value="">— live: pick analyzed —</option>
+      </select>
+      <label class="btn file-label ghost" id="uploadCLabel" style="display:none;">
+        Analyze new .c (live)
+        <input type="file" id="uploadC" accept=".c,.cc,.cpp,.cxx" />
+      </label>
+      <span class="run-pill" id="serverStatus" style="display:none;">● connecting…</span>
+
       <button class="btn accent" id="exportPdf">Export PDF</button>
     </div>
   </header>
-
-  <!-- ─── RECOMMENDATION VALIDATION (always visible — proof, not just detection) ─── -->
-  <div class="card" id="validationCard">
-    <div class="card-header">
-      <div class="card-title"><span class="dot"></span>Recommendation Validation</div>
-      <div class="card-sub" id="validationSub">Checking for the live-validation server…</div>
-    </div>
-
-    <!-- LIVE MODE: validation_server.py is running — validate whatever's actually loaded -->
-    <div id="validationLive" style="display:none;">
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-        <span class="card-sub">Analyzed programs:</span>
-        <select class="func-select" id="serverTestcaseSelect"><option value="">— pick one —</option></select>
-        <label class="btn file-label">
-          Analyze new program (.c)
-          <input type="file" id="uploadC" accept=".c,.cc,.cpp,.cxx" />
-        </label>
-        <span class="run-pill" id="serverStatus">● connecting…</span>
-      </div>
-      <div id="validationFuncList"></div>
-      <div class="validation-grid" id="validationResults" style="margin-top:16px;"></div>
-    </div>
-
-    <!-- FALLBACK: no server — fixed case study on Plumb's own testcases only -->
-    <div id="validationFallback" style="display:none;">
-      <div class="val-repro" style="margin-bottom:16px;">
-        ⚠ Live-validation server isn't running, so this is <strong>not</strong> the file(s) loaded
-        above — it's Plumb's own pre-computed case study (<code>test_arith.c</code>,
-        <code>test_branchy.c</code>, <code>test_recursive.c</code>). Run
-        <code>./scripts/validation_server.sh</code> to validate live, against whatever program you
-        actually pick or upload.
-      </div>
-      <div class="validation-grid" id="validationGrid"></div>
-    </div>
-
-    <div class="val-repro">
-      Reproduce the fixed case study with one command: <code>./scripts/validate_recommendations.sh</code> — full write-up in <code>EVALUATION.md §6</code>.
-    </div>
-  </div>
 
   <!-- ─── EMPTY STATE ─── -->
   <div id="emptyState" class="card empty">
@@ -721,6 +695,35 @@ footer.foot a:hover{color:var(--ink);}
         <div class="card-sub">static analysis suggestions per function</div>
       </div>
       <div class="recs-grid" id="recsGrid"></div>
+      <div class="card-sub" id="validateHint" style="margin-top:12px;display:none;">Click <b>▶</b> on any tag above to validate it live — the real LLVM transform, run against this exact function.</div>
+    </div>
+
+    <!-- RECOMMENDATION VALIDATION (results land here when you click ▶ above) -->
+    <div class="card" id="validationCard">
+      <div class="card-header">
+        <div class="card-title"><span class="dot"></span>Recommendation Validation</div>
+        <div class="card-sub" id="validationSub">Checking for the live-validation server…</div>
+      </div>
+
+      <div id="validationResults" class="validation-grid">
+        <div class="card-sub">Pick or upload a program above to see a live before/after validation here.</div>
+      </div>
+
+      <!-- FALLBACK: no server — fixed case study on Plumb's own testcases only -->
+      <div id="validationFallback" style="display:none;">
+        <div class="val-repro" style="margin-bottom:16px;">
+          ⚠ Live-validation server isn't running, so this is <strong>not</strong> the file(s) loaded
+          above — it's Plumb's own pre-computed case study (<code>test_arith.c</code>,
+          <code>test_branchy.c</code>, <code>test_recursive.c</code>). Run
+          <code>./scripts/validation_server.sh</code> to validate live instead, against whatever
+          program you actually pick or upload above.
+        </div>
+        <div class="validation-grid" id="validationGrid"></div>
+      </div>
+
+      <div class="val-repro">
+        Reproduce the fixed case study with one command: <code>./scripts/validate_recommendations.sh</code> — full write-up in <code>EVALUATION.md §6</code>.
+      </div>
     </div>
 
     <!-- FUNCTION TABLE -->
@@ -1364,12 +1367,20 @@ function renderDiffMode() {
 function refreshRecs() {
   if (STATE.mode === 'diff') return; // handled in renderDiffMode
   const grid = document.getElementById('recsGrid');
+  // Validate buttons only make sense when the currently-loaded data came
+  // through the live picker/upload (SERVER.testcase/level set) — a plain
+  // "Load JSON (A)" of some arbitrary file has no known IR on the server
+  // to run opt against, so it stays a plain, non-interactive chip.
+  const canValidate = SERVER.available && SERVER.testcase && SERVER.level;
   grid.innerHTML = '';
   for (const f of activeData().functions) {
     const card = document.createElement('div');
     card.className = 'rec-card';
     const badges = (f.recommendations || []).map(r =>
-      `<span class="chip ${recClass(r)}">${r}</span>`).join('');
+      canValidate
+        ? `<button class="chip ${recClass(r)}" onclick="runLiveValidation('${f.name}','${r}')" title="Validate this live against the real opt transform">${r} ▶</button>`
+        : `<span class="chip ${recClass(r)}">${r}</span>`
+    ).join('');
     card.innerHTML = `
       <div class="fname">${f.name}</div>
       <div class="badges">${badges || '<span class="chip">no flags</span>'}</div>
@@ -1378,6 +1389,8 @@ function refreshRecs() {
       <div class="meta">energy ≈ ${(f.energyPj/1000).toFixed(2)} nJ · hottest group: <b style="color:${GROUP_COLORS[f.mostExpensiveGroup]||'#fff'}">${f.mostExpensiveGroup}</b></div>`;
     grid.appendChild(card);
   }
+  const hint = document.getElementById('validateHint');
+  if (hint) hint.style.display = canValidate ? '' : 'none';
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1476,25 +1489,38 @@ function renderValidationSection() {
 const SERVER = { available: false, testcase: null, level: null };
 
 async function initServerMode() {
+  const liveEls = ['liveSep', 'serverTestcaseSelect', 'uploadCLabel', 'serverStatus']
+    .map(id => document.getElementById(id));
   try {
     const res = await fetch('/api/testcases');
     if (!res.ok) throw new Error('server responded ' + res.status);
     const data = await res.json();
     SERVER.available = true;
-    document.getElementById('validationLive').style.display = '';
+    liveEls.forEach(el => el.style.display = '');
     document.getElementById('validationFallback').style.display = 'none';
     document.getElementById('validationSub').textContent =
-      'Live — pick an analyzed program or upload a new one below, then validate any of its tags for real.';
+      'Live — pick an analyzed program or upload a new one from the header, then validate any of its tags for real.';
     document.getElementById('serverStatus').textContent = '● connected';
     populateServerPicker(data.testcases);
+    // Auto-select test_floatmm to match the DEMO_A/DEMO_B already on
+    // screen, so live mode is fully populated — charts AND a real
+    // validation result — with zero clicks, not just an empty panel
+    // waiting for input.
+    const defaultEntry = data.testcases.find(t => t.testcase === 'test_floatmm' && t.level === 'O0');
+    if (defaultEntry) {
+      const sel = document.getElementById('serverTestcaseSelect');
+      sel.value = JSON.stringify({ testcase: 'test_floatmm', level: 'O0' });
+      await loadServerTestcase('test_floatmm', 'O0');
+    }
   } catch (e) {
     SERVER.available = false;
-    document.getElementById('validationLive').style.display = 'none';
+    liveEls.forEach(el => el.style.display = 'none');
     document.getElementById('validationFallback').style.display = '';
     document.getElementById('validationSub').textContent =
       'Fixed case study — live-validation server not running (see banner below).';
     renderValidationSection();
   }
+  refreshRecs(); // re-render so Validate buttons appear/disappear based on SERVER.available
 }
 
 function populateServerPicker(testcases) {
@@ -1549,25 +1575,42 @@ async function loadServerTestcase(testcase, level) {
   if (json.error) { alert(json.error); return; }
   SERVER.testcase = testcase; SERVER.level = level;
   // Feed it through the EXACT same path as a manual "Load JSON (A)" upload,
-  // so the whole dashboard (KPIs, charts, heatmap, CFG, table) reacts to
-  // whatever was picked/uploaded too — not just this validation panel.
+  // so the whole dashboard (KPIs, charts, heatmap, CFG, table, and now the
+  // Validate buttons on Optimisation Recommendations) reacts to whatever
+  // was picked/uploaded — one load path, one place tags (and their Validate
+  // actions) live.
   validate(json);
   STATE.rawA = json;
   onDataLoaded();
-  renderValidationFuncList(json.functions);
+  autoValidateSample(json.functions);
 }
 
-function renderValidationFuncList(functions) {
-  const box = document.getElementById('validationFuncList');
-  box.innerHTML = functions.map(f => {
-    const chips = (f.recommendations || []).map(tag =>
-      `<button class="chip ${recClass(tag)}" onclick="runLiveValidation('${f.name}','${tag}')">${tag} ▶</button>`
-    ).join(' ');
-    return `<div class="val-func-row">
-      <span class="vf-name">${f.name}</span>
-      ${chips || '<span class="chip">no flags</span>'}
-    </div>`;
-  }).join('') || '<div class="card-sub">no functions</div>';
+/* Auto-run a real validation the moment a program loads, instead of
+   waiting for a click — one example per distinct recommendation tag
+   present (so a program with 20 HOTSPOT functions still only fires 5
+   opt calls, not 20), sequentially since the server is single-threaded.
+   Manual ▶ buttons on Optimisation Recommendations still work for
+   anything not covered by this sample, or to re-run one. */
+async function autoValidateSample(functions) {
+  const seen = new Set();
+  const sample = [];
+  for (const f of functions) {
+    for (const tag of f.recommendations || []) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      sample.push([f.name, tag]);
+    }
+  }
+  const box = document.getElementById('validationResults');
+  if (!sample.length) {
+    box.innerHTML = '<div class="card-sub">No recommendation tags on this program to validate.</div>';
+    return;
+  }
+  box.innerHTML = `<div class="card-sub" id="autoValLoading">Auto-validating ${sample.length} example(s) live — one per tag present…</div>`;
+  for (const [fn, tag] of sample) {
+    await runLiveValidation(fn, tag);
+  }
+  document.getElementById('autoValLoading')?.remove();
 }
 
 async function runLiveValidation(functionName, tag) {
@@ -1749,141 +1792,1109 @@ async function exportPdf() {
   }
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   DEMO DATA  (so dashboard works even before pass is built)
-   ═══════════════════════════════════════════════════════════════ */
+/* DEMO_DATA_BEGIN — auto-generated by run.sh from results/test_floatmm.{O0,O2}.json.
+   DO NOT HAND-EDIT this block — re-run ./run.sh to refresh it. Real captured
+   Plumb output (not synthetic numbers) so the dashboard's default/demo view
+   is honest, including the documented -O2 inliner-inflation failure mode
+   (EVALUATION.md §5.1) visible in main's cost going up, not down. */
 const DEMO_A = {
-  metadata:{
-    tool:'Plumb', version:'2.0', runLabel:'O0', module:'demo.bc',
-    timestamp:'2026-05-03T10:00:00Z', hotThreshold:50, inlineThreshold:20,
-    weights:{add:1,mul:2,memory:3,call:5,branch:1,compare:1,cast:1,alloca:1,phi:0,other:0},
-    energyModelPj:{add:0.4,mul:3.4,memory:50,call:100,branch:0.1,compare:0.1,cast:0.5,alloca:5,phi:0.05,other:1},
-    totals:{totalCost:412,totalInstructions:178,functionCount:5,estimatedEnergyPj:9874}
+  "metadata": {
+    "tool": "Plumb",
+    "version": "2.0",
+    "runLabel": "O0",
+    "module": "ir/test_floatmm.O0.ll",
+    "timestamp": "2026-07-14T02:25:32Z",
+    "hotThreshold": 30,
+    "inlineThreshold": 20,
+    "weights": {
+      "add": 1,
+      "alloca": 1,
+      "branch": 1,
+      "call": 5,
+      "cast": 1,
+      "compare": 1,
+      "memory": 3,
+      "mul": 2,
+      "other": 0,
+      "phi": 0
+    },
+    "energyModelPj": {
+      "add": 0.4,
+      "alloca": 5,
+      "branch": 0.1,
+      "call": 100,
+      "cast": 0.5,
+      "compare": 0.1,
+      "memory": 50,
+      "mul": 3.4,
+      "other": 1,
+      "phi": 0.05
+    },
+    "totals": {
+      "totalCost": 514,
+      "totalInstructions": 174,
+      "functionCount": 3,
+      "estimatedEnergyPj": 4487.9
+    }
   },
-  functions:[
-    { name:'matmul', totalCost:240, totalInstructions:62, cyclomaticComplexity:7, loopCount:3, maxLoopDepth:3,
-      energyPj:6500, criticalPathCost:204, isHotspot:true, isRecursive:false,
-      mostExpensiveGroup:'memory',
-      recommendations:['HOTSPOT','VECTORIZABLE'],
-      criticalPath:['entry','i.head','j.head','k.head','k.body','j.tail','i.tail','exit'],
-      groups:[
-        {group:'add',count:9,weight:1,cost:18,pct:7.5,indirect:0},
-        {group:'mul',count:6,weight:2,cost:24,pct:10,indirect:0},
-        {group:'memory',count:14,weight:3,cost:126,pct:52.5,indirect:0},
-        {group:'branch',count:8,weight:1,cost:24,pct:10,indirect:0},
-        {group:'compare',count:6,weight:1,cost:18,pct:7.5,indirect:0},
-        {group:'alloca',count:4,weight:1,cost:4,pct:1.7,indirect:0},
-        {group:'cast',count:4,weight:1,cost:12,pct:5,indirect:0},
-        {group:'phi',count:11,weight:0,cost:14,pct:5.8,indirect:0}
+  "functions": [
+    {
+      "name": "matmul",
+      "totalCost": 335,
+      "totalInstructions": 78,
+      "cyclomaticComplexity": 4,
+      "loopCount": 1,
+      "maxLoopDepth": 3,
+      "energyPj": 2059.6,
+      "criticalPathCost": 264,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "memory",
+      "recommendations": [
+        "HOTSPOT"
       ],
-      basicBlocks:[
-        {label:'entry',cost:6,instructions:6,loopDepth:0,isCritical:true,successors:['i.head']},
-        {label:'i.head',cost:8,instructions:4,loopDepth:1,isCritical:true,successors:['j.head','exit']},
-        {label:'j.head',cost:14,instructions:6,loopDepth:2,isCritical:true,successors:['k.head','j.tail']},
-        {label:'k.head',cost:30,instructions:8,loopDepth:3,isCritical:true,successors:['k.body','j.tail']},
-        {label:'k.body',cost:120,instructions:18,loopDepth:3,isCritical:true,successors:['k.head']},
-        {label:'j.tail',cost:14,instructions:6,loopDepth:2,isCritical:true,successors:['j.head']},
-        {label:'i.tail',cost:8,instructions:4,loopDepth:1,isCritical:true,successors:['i.head']},
-        {label:'exit',cost:4,instructions:2,loopDepth:0,isCritical:true,successors:[]}
+      "criticalPath": [
+        "bb.0",
+        "bb.1",
+        "bb.2",
+        "bb.3",
+        "bb.4",
+        "bb.5",
+        "bb.6",
+        "bb.7"
+      ],
+      "groups": [
+        {
+          "group": "add",
+          "count": 6,
+          "weight": 1,
+          "cost": 14,
+          "pct": 4.1791,
+          "indirect": 0
+        },
+        {
+          "group": "mul",
+          "count": 3,
+          "weight": 2,
+          "cost": 16,
+          "pct": 4.77612,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 38,
+          "weight": 3,
+          "cost": 246,
+          "pct": 73.4328,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 1,
+          "weight": 5,
+          "cost": 15,
+          "pct": 4.47761,
+          "indirect": 0
+        },
+        {
+          "group": "branch",
+          "count": 12,
+          "weight": 1,
+          "cost": 22,
+          "pct": 6.56716,
+          "indirect": 0
+        },
+        {
+          "group": "compare",
+          "count": 3,
+          "weight": 1,
+          "cost": 6,
+          "pct": 1.79104,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 3,
+          "weight": 1,
+          "cost": 8,
+          "pct": 2.38806,
+          "indirect": 0
+        },
+        {
+          "group": "alloca",
+          "count": 8,
+          "weight": 1,
+          "cost": 8,
+          "pct": 2.38806,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 4,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
+      ],
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 24,
+          "instructions": 14,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.1",
+          "cost": 8,
+          "instructions": 4,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.2",
+            "bb.12"
+          ]
+        },
+        {
+          "label": "bb.2",
+          "cost": 4,
+          "instructions": 2,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.3",
+          "cost": 16,
+          "instructions": 4,
+          "loopDepth": 2,
+          "isCritical": true,
+          "successors": [
+            "bb.4",
+            "bb.10"
+          ]
+        },
+        {
+          "label": "bb.4",
+          "cost": 14,
+          "instructions": 3,
+          "loopDepth": 2,
+          "isCritical": true,
+          "successors": [
+            "bb.5"
+          ]
+        },
+        {
+          "label": "bb.5",
+          "cost": 24,
+          "instructions": 4,
+          "loopDepth": 3,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.8"
+          ]
+        },
+        {
+          "label": "bb.6",
+          "cost": 150,
+          "instructions": 22,
+          "loopDepth": 3,
+          "isCritical": true,
+          "successors": [
+            "bb.7"
+          ]
+        },
+        {
+          "label": "bb.7",
+          "cost": 24,
+          "instructions": 4,
+          "loopDepth": 3,
+          "isCritical": true,
+          "successors": [
+            "bb.5"
+          ]
+        },
+        {
+          "label": "bb.8",
+          "cost": 46,
+          "instructions": 11,
+          "loopDepth": 2,
+          "isCritical": false,
+          "successors": [
+            "bb.9"
+          ]
+        },
+        {
+          "label": "bb.9",
+          "cost": 16,
+          "instructions": 4,
+          "loopDepth": 2,
+          "isCritical": false,
+          "successors": [
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.10",
+          "cost": 1,
+          "instructions": 1,
+          "loopDepth": 1,
+          "isCritical": false,
+          "successors": [
+            "bb.11"
+          ]
+        },
+        {
+          "label": "bb.11",
+          "cost": 8,
+          "instructions": 4,
+          "loopDepth": 1,
+          "isCritical": false,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.12",
+          "cost": 0,
+          "instructions": 1,
+          "loopDepth": 0,
+          "isCritical": false,
+          "successors": []
+        }
       ]
     },
-    { name:'fib', totalCost:48, totalInstructions:18, cyclomaticComplexity:3, loopCount:0, maxLoopDepth:0,
-      energyPj:1240, criticalPathCost:42, isHotspot:false, isRecursive:true,
-      mostExpensiveGroup:'call',
-      recommendations:['RECURSIVE'],
-      criticalPath:['entry','rec','exit'],
-      groups:[
-        {group:'add',count:2,weight:1,cost:2,pct:4.2,indirect:0},
-        {group:'compare',count:1,weight:1,cost:1,pct:2.1,indirect:0},
-        {group:'branch',count:2,weight:1,cost:2,pct:4.2,indirect:0},
-        {group:'call',count:2,weight:5,cost:30,pct:62.5,indirect:0},
-        {group:'memory',count:3,weight:3,cost:9,pct:18.8,indirect:0},
-        {group:'alloca',count:2,weight:1,cost:2,pct:4.2,indirect:0},
-        {group:'phi',count:1,weight:0,cost:0,pct:0,indirect:0}
+    {
+      "name": "scale_rows",
+      "totalCost": 67,
+      "totalInstructions": 33,
+      "cyclomaticComplexity": 2,
+      "loopCount": 1,
+      "maxLoopDepth": 1,
+      "energyPj": 928.3,
+      "criticalPathCost": 67,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "memory",
+      "recommendations": [
+        "HOTSPOT"
       ],
-      basicBlocks:[
-        {label:'entry',cost:6,instructions:5,loopDepth:0,isCritical:true,successors:['base','rec']},
-        {label:'base',cost:4,instructions:2,loopDepth:0,isCritical:false,successors:['exit']},
-        {label:'rec',cost:36,instructions:9,loopDepth:0,isCritical:true,successors:['exit']},
-        {label:'exit',cost:2,instructions:2,loopDepth:0,isCritical:true,successors:[]}
+      "criticalPath": [
+        "bb.0",
+        "bb.1",
+        "bb.2",
+        "bb.3"
+      ],
+      "groups": [
+        {
+          "group": "add",
+          "count": 1,
+          "weight": 1,
+          "cost": 1,
+          "pct": 1.49254,
+          "indirect": 0
+        },
+        {
+          "group": "mul",
+          "count": 1,
+          "weight": 2,
+          "cost": 2,
+          "pct": 2.98507,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 16,
+          "weight": 3,
+          "cost": 48,
+          "pct": 71.6418,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 1,
+          "weight": 5,
+          "cost": 5,
+          "pct": 7.46269,
+          "indirect": 0
+        },
+        {
+          "group": "branch",
+          "count": 4,
+          "weight": 1,
+          "cost": 4,
+          "pct": 5.97015,
+          "indirect": 0
+        },
+        {
+          "group": "compare",
+          "count": 1,
+          "weight": 1,
+          "cost": 1,
+          "pct": 1.49254,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 2,
+          "weight": 1,
+          "cost": 2,
+          "pct": 2.98507,
+          "indirect": 0
+        },
+        {
+          "group": "alloca",
+          "count": 4,
+          "weight": 1,
+          "cost": 4,
+          "pct": 5.97015,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 3,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
+      ],
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 17,
+          "instructions": 9,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.1",
+          "cost": 13,
+          "instructions": 6,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.2",
+            "bb.4"
+          ]
+        },
+        {
+          "label": "bb.2",
+          "cost": 29,
+          "instructions": 13,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.3",
+          "cost": 8,
+          "instructions": 4,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.4",
+          "cost": 0,
+          "instructions": 1,
+          "loopDepth": 0,
+          "isCritical": false,
+          "successors": []
+        }
       ]
     },
-    { name:'square', totalCost:6, totalInstructions:6, cyclomaticComplexity:1, loopCount:0, maxLoopDepth:0,
-      energyPj:120, criticalPathCost:6, isHotspot:false, isRecursive:false,
-      mostExpensiveGroup:'memory',
-      recommendations:['INLINE_CANDIDATE'],
-      criticalPath:['entry'],
-      groups:[
-        {group:'memory',count:2,weight:3,cost:6,pct:100,indirect:0},
-        {group:'mul',count:1,weight:2,cost:0,pct:0,indirect:0},
-        {group:'alloca',count:1,weight:1,cost:0,pct:0,indirect:0}
+    {
+      "name": "main",
+      "totalCost": 112,
+      "totalInstructions": 63,
+      "cyclomaticComplexity": 3,
+      "loopCount": 2,
+      "maxLoopDepth": 1,
+      "energyPj": 1500,
+      "criticalPathCost": 64,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "memory",
+      "recommendations": [
+        "VECTORIZABLE",
+        "HOTSPOT"
       ],
-      basicBlocks:[
-        {label:'entry',cost:6,instructions:6,loopDepth:0,isCritical:true,successors:[]}
-      ]
-    },
-    { name:'classify', totalCost:38, totalInstructions:22, cyclomaticComplexity:6, loopCount:0, maxLoopDepth:0,
-      energyPj:520, criticalPathCost:18, isHotspot:false, isRecursive:false,
-      mostExpensiveGroup:'branch',
-      recommendations:[],
-      criticalPath:['entry','t1','t2','t3','exit'],
-      groups:[
-        {group:'compare',count:6,weight:1,cost:6,pct:15.8,indirect:0},
-        {group:'branch',count:7,weight:1,cost:7,pct:18.4,indirect:0},
-        {group:'memory',count:5,weight:3,cost:15,pct:39.5,indirect:0},
-        {group:'cast',count:2,weight:1,cost:2,pct:5.3,indirect:0},
-        {group:'add',count:2,weight:1,cost:2,pct:5.3,indirect:0},
-        {group:'phi',count:0,weight:0,cost:0,pct:0,indirect:0}
+      "criticalPath": [
+        "bb.0",
+        "bb.1",
+        "bb.4",
+        "bb.5",
+        "bb.6",
+        "bb.7"
       ],
-      basicBlocks:[
-        {label:'entry',cost:5,instructions:4,loopDepth:0,isCritical:true,successors:['t1','exit']},
-        {label:'t1',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['t2','exit']},
-        {label:'t2',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['t3','exit']},
-        {label:'t3',cost:6,instructions:3,loopDepth:0,isCritical:true,successors:['exit']},
-        {label:'exit',cost:15,instructions:9,loopDepth:0,isCritical:true,successors:[]}
-      ]
-    },
-    { name:'main', totalCost:80, totalInstructions:70, cyclomaticComplexity:4, loopCount:1, maxLoopDepth:1,
-      energyPj:1494, criticalPathCost:64, isHotspot:false, isRecursive:false,
-      mostExpensiveGroup:'call',
-      recommendations:[],
-      criticalPath:['entry','loop','exit'],
-      groups:[
-        {group:'memory',count:8,weight:3,cost:24,pct:30,indirect:0},
-        {group:'call',count:6,weight:5,cost:30,pct:37.5,indirect:0},
-        {group:'add',count:6,weight:1,cost:6,pct:7.5,indirect:0},
-        {group:'branch',count:3,weight:1,cost:3,pct:3.8,indirect:0},
-        {group:'compare',count:2,weight:1,cost:2,pct:2.5,indirect:0},
-        {group:'alloca',count:5,weight:1,cost:5,pct:6.2,indirect:0},
-        {group:'cast',count:3,weight:1,cost:3,pct:3.8,indirect:0},
-        {group:'other',count:7,weight:0,cost:0,pct:0,indirect:0},
-        {group:'phi',count:0,weight:0,cost:0,pct:0,indirect:0}
+      "groups": [
+        {
+          "group": "add",
+          "count": 5,
+          "weight": 1,
+          "cost": 5,
+          "pct": 4.46429,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 23,
+          "weight": 3,
+          "cost": 69,
+          "pct": 61.6071,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 3,
+          "weight": 5,
+          "cost": 15,
+          "pct": 13.3929,
+          "indirect": 0
+        },
+        {
+          "group": "branch",
+          "count": 8,
+          "weight": 1,
+          "cost": 8,
+          "pct": 7.14286,
+          "indirect": 0
+        },
+        {
+          "group": "compare",
+          "count": 2,
+          "weight": 1,
+          "cost": 2,
+          "pct": 1.78571,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 6,
+          "weight": 1,
+          "cost": 6,
+          "pct": 5.35714,
+          "indirect": 0
+        },
+        {
+          "group": "alloca",
+          "count": 7,
+          "weight": 1,
+          "cost": 7,
+          "pct": 6.25,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 9,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
       ],
-      basicBlocks:[
-        {label:'entry',cost:24,instructions:24,loopDepth:0,isCritical:true,successors:['loop']},
-        {label:'loop',cost:48,instructions:32,loopDepth:1,isCritical:true,successors:['loop','exit']},
-        {label:'exit',cost:8,instructions:14,loopDepth:0,isCritical:true,successors:[]}
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 14,
+          "instructions": 10,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.1",
+          "cost": 5,
+          "instructions": 3,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.2",
+            "bb.4"
+          ]
+        },
+        {
+          "label": "bb.2",
+          "cost": 32,
+          "instructions": 19,
+          "loopDepth": 1,
+          "isCritical": false,
+          "successors": [
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.3",
+          "cost": 8,
+          "instructions": 4,
+          "loopDepth": 1,
+          "isCritical": false,
+          "successors": [
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.4",
+          "cost": 17,
+          "instructions": 9,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.5"
+          ]
+        },
+        {
+          "label": "bb.5",
+          "cost": 5,
+          "instructions": 3,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.8"
+          ]
+        },
+        {
+          "label": "bb.6",
+          "cost": 15,
+          "instructions": 8,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.7"
+          ]
+        },
+        {
+          "label": "bb.7",
+          "cost": 8,
+          "instructions": 4,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.5"
+          ]
+        },
+        {
+          "label": "bb.8",
+          "cost": 8,
+          "instructions": 3,
+          "loopDepth": 0,
+          "isCritical": false,
+          "successors": []
+        }
       ]
     }
   ]
 };
-
-// O2-style demo: same functions, optimised costs (smaller, fewer BBs)
-const DEMO_B = JSON.parse(JSON.stringify(DEMO_A));
-DEMO_B.metadata.runLabel = 'O2';
-DEMO_B.metadata.timestamp = '2026-05-03T10:05:00Z';
-for (const f of DEMO_B.functions) {
-  const factor = f.name === 'matmul' ? 0.55 : (f.name === 'fib' ? 0.65 : 0.78);
-  f.totalCost = Math.round(f.totalCost * factor);
-  f.totalInstructions = Math.round(f.totalInstructions * factor);
-  f.energyPj = Math.round(f.energyPj * factor);
-  f.criticalPathCost = Math.round(f.criticalPathCost * factor);
-  for (const g of f.groups) g.cost = Math.round(g.cost * factor);
-  for (const b of f.basicBlocks) {
-    b.cost = Math.round(b.cost * factor);
-    b.instructions = Math.round(b.instructions * factor);
-  }
-}
+const DEMO_B = {
+  "metadata": {
+    "tool": "Plumb",
+    "version": "2.0",
+    "runLabel": "O2",
+    "module": "ir/test_floatmm.O2.ll",
+    "timestamp": "2026-07-14T02:25:32Z",
+    "hotThreshold": 30,
+    "inlineThreshold": 20,
+    "weights": {
+      "add": 1,
+      "alloca": 1,
+      "branch": 1,
+      "call": 5,
+      "cast": 1,
+      "compare": 1,
+      "memory": 3,
+      "mul": 2,
+      "other": 0,
+      "phi": 0
+    },
+    "energyModelPj": {
+      "add": 0.4,
+      "alloca": 5,
+      "branch": 0.1,
+      "call": 100,
+      "cast": 0.5,
+      "compare": 0.1,
+      "memory": 50,
+      "mul": 3.4,
+      "other": 1,
+      "phi": 0.05
+    },
+    "totals": {
+      "totalCost": 514,
+      "totalInstructions": 228,
+      "functionCount": 3,
+      "estimatedEnergyPj": 7546.15
+    }
+  },
+  "functions": [
+    {
+      "name": "matmul",
+      "totalCost": 81,
+      "totalInstructions": 33,
+      "cyclomaticComplexity": 5,
+      "loopCount": 1,
+      "maxLoopDepth": 3,
+      "energyPj": 265.5,
+      "criticalPathCost": 81,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "memory",
+      "recommendations": [
+        "HOTSPOT"
+      ],
+      "criticalPath": [
+        "bb.0",
+        "bb.1",
+        "bb.2",
+        "bb.4",
+        "bb.7",
+        "bb.6",
+        "bb.5",
+        "bb.3"
+      ],
+      "groups": [
+        {
+          "group": "add",
+          "count": 6,
+          "weight": 1,
+          "cost": 14,
+          "pct": 17.284,
+          "indirect": 0
+        },
+        {
+          "group": "mul",
+          "count": 2,
+          "weight": 2,
+          "cost": 8,
+          "pct": 9.87654,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 3,
+          "weight": 3,
+          "cost": 24,
+          "pct": 29.6296,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 1,
+          "weight": 5,
+          "cost": 15,
+          "pct": 18.5185,
+          "indirect": 0
+        },
+        {
+          "group": "branch",
+          "count": 7,
+          "weight": 1,
+          "cost": 11,
+          "pct": 13.5802,
+          "indirect": 0
+        },
+        {
+          "group": "compare",
+          "count": 4,
+          "weight": 1,
+          "cost": 7,
+          "pct": 8.64198,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 2,
+          "weight": 1,
+          "cost": 2,
+          "pct": 2.46914,
+          "indirect": 0
+        },
+        {
+          "group": "phi",
+          "count": 4,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 4,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
+      ],
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 2,
+          "instructions": 2,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.1",
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.1",
+          "cost": 3,
+          "instructions": 3,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.2"
+          ]
+        },
+        {
+          "label": "bb.2",
+          "cost": 3,
+          "instructions": 3,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.4"
+          ]
+        },
+        {
+          "label": "bb.3",
+          "cost": 0,
+          "instructions": 1,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": []
+        },
+        {
+          "label": "bb.4",
+          "cost": 2,
+          "instructions": 2,
+          "loopDepth": 2,
+          "isCritical": true,
+          "successors": [
+            "bb.7"
+          ]
+        },
+        {
+          "label": "bb.5",
+          "cost": 3,
+          "instructions": 3,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.3",
+            "bb.2"
+          ]
+        },
+        {
+          "label": "bb.6",
+          "cost": 14,
+          "instructions": 6,
+          "loopDepth": 2,
+          "isCritical": true,
+          "successors": [
+            "bb.5",
+            "bb.4"
+          ]
+        },
+        {
+          "label": "bb.7",
+          "cost": 54,
+          "instructions": 13,
+          "loopDepth": 3,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.7"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "scale_rows",
+      "totalCost": 55,
+      "totalInstructions": 41,
+      "cyclomaticComplexity": 6,
+      "loopCount": 2,
+      "maxLoopDepth": 1,
+      "energyPj": 616.45,
+      "criticalPathCost": 55,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "memory",
+      "recommendations": [
+        "HOTSPOT"
+      ],
+      "criticalPath": [
+        "bb.0",
+        "bb.1",
+        "bb.2",
+        "bb.3",
+        "bb.4",
+        "bb.5",
+        "bb.7",
+        "bb.6"
+      ],
+      "groups": [
+        {
+          "group": "add",
+          "count": 3,
+          "weight": 1,
+          "cost": 3,
+          "pct": 5.45455,
+          "indirect": 0
+        },
+        {
+          "group": "mul",
+          "count": 1,
+          "weight": 2,
+          "cost": 2,
+          "pct": 3.63636,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 6,
+          "weight": 3,
+          "cost": 18,
+          "pct": 32.7273,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 3,
+          "weight": 5,
+          "cost": 15,
+          "pct": 27.2727,
+          "indirect": 0
+        },
+        {
+          "group": "branch",
+          "count": 7,
+          "weight": 1,
+          "cost": 7,
+          "pct": 12.7273,
+          "indirect": 0
+        },
+        {
+          "group": "compare",
+          "count": 5,
+          "weight": 1,
+          "cost": 5,
+          "pct": 9.09091,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 5,
+          "weight": 1,
+          "cost": 5,
+          "pct": 9.09091,
+          "indirect": 0
+        },
+        {
+          "group": "phi",
+          "count": 3,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 8,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
+      ],
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 4,
+          "instructions": 3,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.1"
+          ]
+        },
+        {
+          "label": "bb.1",
+          "cost": 3,
+          "instructions": 3,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.5",
+            "bb.2"
+          ]
+        },
+        {
+          "label": "bb.2",
+          "cost": 2,
+          "instructions": 6,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.3",
+          "cost": 29,
+          "instructions": 16,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.4",
+            "bb.3"
+          ]
+        },
+        {
+          "label": "bb.4",
+          "cost": 2,
+          "instructions": 2,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.5"
+          ]
+        },
+        {
+          "label": "bb.5",
+          "cost": 1,
+          "instructions": 2,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": [
+            "bb.7"
+          ]
+        },
+        {
+          "label": "bb.6",
+          "cost": 0,
+          "instructions": 1,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": []
+        },
+        {
+          "label": "bb.7",
+          "cost": 14,
+          "instructions": 8,
+          "loopDepth": 1,
+          "isCritical": true,
+          "successors": [
+            "bb.6",
+            "bb.7"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "main",
+      "totalCost": 378,
+      "totalInstructions": 154,
+      "cyclomaticComplexity": 1,
+      "loopCount": 0,
+      "maxLoopDepth": 0,
+      "energyPj": 6664.2,
+      "criticalPathCost": 378,
+      "isHotspot": true,
+      "isRecursive": false,
+      "mostExpensiveGroup": "call",
+      "recommendations": [
+        "HOTSPOT"
+      ],
+      "criticalPath": [
+        "bb.0"
+      ],
+      "groups": [
+        {
+          "group": "add",
+          "count": 18,
+          "weight": 1,
+          "cost": 18,
+          "pct": 4.7619,
+          "indirect": 0
+        },
+        {
+          "group": "memory",
+          "count": 28,
+          "weight": 3,
+          "cost": 84,
+          "pct": 22.2222,
+          "indirect": 0
+        },
+        {
+          "group": "call",
+          "count": 52,
+          "weight": 5,
+          "cost": 260,
+          "pct": 68.7831,
+          "indirect": 0
+        },
+        {
+          "group": "cast",
+          "count": 14,
+          "weight": 1,
+          "cost": 14,
+          "pct": 3.7037,
+          "indirect": 0
+        },
+        {
+          "group": "alloca",
+          "count": 2,
+          "weight": 1,
+          "cost": 2,
+          "pct": 0.529101,
+          "indirect": 0
+        },
+        {
+          "group": "other",
+          "count": 40,
+          "weight": 0,
+          "cost": 0,
+          "pct": 0,
+          "indirect": 0
+        }
+      ],
+      "basicBlocks": [
+        {
+          "label": "bb.0",
+          "cost": 378,
+          "instructions": 154,
+          "loopDepth": 0,
+          "isCritical": true,
+          "successors": []
+        }
+      ]
+    }
+  ]
+};
+/* DEMO_DATA_END */
 
 /* VALIDATION_DATA_BEGIN — auto-generated by scripts/validate_recommendations.py
    from validation/summary.json. DO NOT HAND-EDIT this block — re-run
@@ -2023,6 +3034,13 @@ const VALIDATION_DATA = {
 };
 /* VALIDATION_DATA_END */
 
+// Auto-load real captured output on open (DEMO_A/DEMO_B are genuine
+// test_floatmm results, not synthetic — see DEMO_DATA_BEGIN above) so
+// the dashboard shows something real immediately, whether that's a
+// local file:// open or the hosted GitHub Pages copy. Loading your own
+// results.json (or, in live mode, picking/uploading a program) simply
+// replaces this.
+loadDemoData();
 initServerMode();
 </script>
 </body>
