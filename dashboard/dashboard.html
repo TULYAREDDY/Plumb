@@ -94,7 +94,7 @@ body::before{
 }
 
 /* ── Layout ── */
-.shell{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:32px 28px 96px;}
+.shell{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:28px 28px 96px;}
 
 /* ── Header / top nav ── */
 header.topbar{
@@ -115,6 +115,34 @@ header.topbar{
 }
 .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .toolbar-sep{width:1px;height:22px;background:var(--hairline-strong);margin:0 4px;}
+.topbar{align-items:center;}
+.top-status{
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;
+  padding:4px 10px;border-radius:9999px;border:1px solid var(--hairline);
+  color:var(--ink-subtle);background:var(--surface-2);
+}
+.top-status.live{color:#4fd67a;border-color:rgba(39,166,68,0.4);background:rgba(39,166,68,0.1);}
+.welcome-grid{
+  display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:28px;text-align:left;
+}
+.welcome-card{
+  padding:18px 16px;border-radius:12px;border:1px solid var(--hairline);
+  background:var(--surface-1);display:flex;flex-direction:column;gap:10px;
+}
+.welcome-card h3{font-size:14px;font-weight:600;color:var(--ink);margin:0;}
+.welcome-card p{font-size:12px;color:var(--ink-subtle);line-height:1.45;margin:0;flex:1;}
+.welcome-card .wc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.welcome-card.live-only{display:none;}
+body.live-on .welcome-card.live-only{display:flex;}
+.source-bar{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  padding:12px 14px;margin-bottom:20px;border-radius:12px;
+  border:1px solid var(--hairline);background:var(--surface-1);
+}
+.source-bar .sb-info{font-size:13px;color:var(--ink-muted);line-height:1.4;}
+.source-bar .sb-info code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--primary-hover);}
+.source-bar .sb-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+@media (max-width:768px){.welcome-grid{grid-template-columns:1fr;}}
 
 /* Buttons — Linear specs: 8px 14px padding, 8px radius, 14px/500 type */
 .btn{
@@ -513,14 +541,190 @@ footer.foot a:hover{color:var(--ink);}
 ::-webkit-scrollbar-thumb{background:var(--hairline-strong);border-radius:9999px;}
 ::-webkit-scrollbar-thumb:hover{background:var(--ink-tertiary);}
 
+/* ── App frame + floating sidebar ── */
+.app-frame{display:flex;min-height:100vh;position:relative;z-index:1;}
+.sidebar{
+  position:fixed;top:20px;left:20px;bottom:20px;width:220px;z-index:40;
+  display:flex;flex-direction:column;gap:4px;
+  padding:18px 14px;
+  background:rgba(15,16,17,0.82);
+  border:1px solid var(--hairline);
+  border-radius:16px;
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  box-shadow:0 12px 40px rgba(0,0,0,0.45);
+  overflow-y:auto;
+}
+.sidebar .sb-brand{
+  display:flex;flex-direction:column;gap:2px;
+  padding:4px 8px 16px;margin-bottom:8px;
+  border-bottom:1px solid var(--hairline);
+}
+.sidebar .sb-brand strong{
+  font-size:15px;font-weight:600;letter-spacing:-0.3px;color:var(--ink);
+}
+.sidebar .sb-brand span{
+  font-size:11px;color:var(--ink-subtle);
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+}
+.sidebar .sb-label{
+  font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--ink-tertiary);padding:12px 8px 6px;
+}
+.sidebar a.sb-link{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:10px;
+  color:var(--ink-subtle);text-decoration:none;
+  font-size:13px;font-weight:500;letter-spacing:-0.01em;
+  border:1px solid transparent;
+  transition:background .12s ease,color .12s ease,border-color .12s ease;
+}
+.sidebar a.sb-link:hover{background:var(--surface-2);color:var(--ink);}
+.sidebar a.sb-link.active{
+  background:rgba(94,106,210,0.12);
+  color:var(--primary-hover);
+  border-color:rgba(94,106,210,0.35);
+}
+.sidebar a.sb-link .sb-idx{
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:10px;color:var(--ink-tertiary);width:18px;flex-shrink:0;
+}
+.sidebar a.sb-link.active .sb-idx{color:var(--primary-hover);}
+.sidebar .sb-hint{
+  margin-top:auto;padding:12px 10px 4px;
+  font-size:11px;line-height:1.45;color:var(--ink-tertiary);
+  border-top:1px solid var(--hairline);
+}
+.nav-toggle{
+  display:none;position:fixed;top:16px;left:16px;z-index:50;
+  width:40px;height:40px;border-radius:10px;
+  background:rgba(15,16,17,0.9);border:1px solid var(--hairline);
+  color:var(--ink);font-size:18px;cursor:pointer;
+  backdrop-filter:blur(12px);
+}
+.app-main{flex:1;min-width:0;margin-left:260px;}
+.shell{max-width:1100px;margin:0 auto;padding:28px 28px 96px;}
+
+/* Section chrome */
+.dash-section{scroll-margin-top:24px;margin-bottom:8px;}
+.section-head{
+  display:flex;align-items:flex-end;justify-content:space-between;
+  gap:16px;flex-wrap:wrap;
+  margin:8px 0 16px;padding:0 2px;
+}
+.section-head h2{
+  font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;
+  color:var(--ink-subtle);margin:0;
+}
+.section-head p{
+  font-size:13px;color:var(--ink-tertiary);margin:4px 0 0;max-width:520px;line-height:1.45;
+}
+.compare-banner{
+  display:none;margin-bottom:16px;padding:14px 16px;border-radius:12px;
+  background:rgba(94,106,210,0.10);border:1px solid rgba(94,106,210,0.35);
+  font-size:13px;line-height:1.5;color:var(--ink-muted);
+}
+.compare-banner.show{display:block;}
+
+.sbs-grid{
+  display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:stretch;
+  margin-top:16px;
+}
+.sbs-col{
+  border:1px solid var(--hairline);border-radius:12px;padding:18px 16px;
+  background:var(--canvas);
+}
+.sbs-col.before{border-color:var(--hairline-strong);}
+.sbs-col.after{border-color:rgba(94,106,210,0.45);}
+.sbs-col .sbs-label{
+  font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--ink-tertiary);margin-bottom:6px;
+}
+.sbs-col .sbs-title{
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:13px;color:var(--ink-muted);margin-bottom:16px;word-break:break-all;
+}
+.sbs-metric{margin-bottom:14px;}
+.sbs-metric .sm-label{font-size:12px;color:var(--ink-subtle);}
+.sbs-metric .sm-val{
+  font-size:28px;font-weight:600;letter-spacing:-0.8px;color:var(--ink);
+  font-variant-numeric:tabular-nums;line-height:1.2;margin-top:2px;
+}
+.sbs-mid{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;min-width:72px;padding:8px 0;
+}
+.sbs-mid .arrow{
+  font-size:22px;color:var(--primary-hover);font-weight:600;
+}
+.sbs-mid .delta-big{
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:13px;font-weight:600;text-align:center;line-height:1.35;
+}
+.sbs-table-wrap{margin-top:20px;overflow-x:auto;}
+table.sbs-table{width:100%;border-collapse:collapse;font-size:13px;}
+table.sbs-table th, table.sbs-table td{
+  padding:10px 12px;text-align:left;border-bottom:1px solid var(--hairline);
+}
+table.sbs-table th{
+  color:var(--ink-subtle);font-weight:500;font-size:12px;
+}
+table.sbs-table td.num{font-variant-numeric:tabular-nums;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;}
+table.sbs-table tr:hover td{background:var(--surface-2);}
+.rec-picker{display:flex;flex-direction:column;gap:8px;}
+.rec-option{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:14px 14px;border-radius:10px;border:1px solid var(--hairline);
+  background:var(--canvas);cursor:pointer;transition:border-color .12s, background .12s;
+}
+.rec-option:hover{border-color:var(--hairline-strong);background:var(--surface-2);}
+.rec-option.selected{border-color:rgba(94,106,210,0.55);background:rgba(94,106,210,0.10);}
+.rec-option input{margin-top:3px;accent-color:var(--primary);}
+.rec-option .ro-body{flex:1;min-width:0;}
+.rec-option .ro-title{font-size:14px;font-weight:600;color:var(--ink);display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.rec-option .ro-meta{font-size:12px;color:var(--ink-subtle);margin-top:4px;line-height:1.4;}
+.rec-option.disabled{opacity:0.55;cursor:default;}
+.sbs-empty{
+  margin-top:12px;padding:16px;border-radius:10px;border:1px dashed var(--hairline);
+  color:var(--ink-tertiary);font-size:13px;text-align:center;
+}
+@media (max-width:900px){
+  .sbs-grid{grid-template-columns:1fr; }
+  .sbs-mid{flex-direction:row;padding:4px 0;}
+}
+
+.compare-banner strong{color:var(--primary-hover);font-weight:600;}
+.compare-banner .cb-actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;}
+
+.how-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px;
+}
+.how-step{
+  padding:16px;border-radius:12px;border:1px solid var(--hairline);
+  background:var(--surface-1);
+}
+.how-step .n{
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:11px;color:var(--primary-hover);margin-bottom:8px;
+}
+.how-step h3{font-size:14px;font-weight:600;color:var(--ink);margin:0 0 6px;}
+.how-step p{font-size:12px;color:var(--ink-subtle);line-height:1.45;margin:0;}
+
 /* ── Responsive (Linear breakpoints) ── */
+@media (max-width: 1100px){
+  .sidebar{display:none;}
+  .sidebar.open{display:flex;}
+  .nav-toggle{display:grid;place-items:center;}
+  .app-main{margin-left:0;}
+  .shell{padding-top:64px;}
+}
 @media (max-width: 1024px){
   .kpis{grid-template-columns:repeat(2,1fr);}
   .grid-2{grid-template-columns:1fr;}
   .grid-3{grid-template-columns:repeat(2,1fr);}
+  .how-grid{grid-template-columns:1fr;}
 }
 @media (max-width: 768px){
-  .shell{padding:24px 16px 64px;}
+  .shell{padding:64px 16px 64px;}
   .kpis{grid-template-columns:1fr;}
   .grid-3{grid-template-columns:1fr;}
   .card-title{font-size:18px;letter-spacing:-0.3px;}
@@ -531,233 +735,360 @@ footer.foot a:hover{color:var(--ink);}
 </head>
 <body>
 
+<button class="nav-toggle" id="navToggle" aria-label="Open navigation">☰</button>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <strong>Plumb</strong>
+    <span>IR cost dashboard</span>
+  </div>
+  <div class="sb-label">Navigate</div>
+  <a class="sb-link active" href="#sec-overview" data-sec="sec-overview"><span class="sb-idx">01</span>Overview</a>
+  <a class="sb-link" href="#sec-costs" data-sec="sec-costs"><span class="sb-idx">02</span>Cost charts</a>
+  <a class="sb-link" href="#sec-blocks" data-sec="sec-blocks"><span class="sb-idx">03</span>Hot blocks</a>
+  <a class="sb-link" href="#sec-cfg" data-sec="sec-cfg"><span class="sb-idx">04</span>CFG</a>
+  <a class="sb-link" href="#sec-weights" data-sec="sec-weights"><span class="sb-idx">05</span>Weights</a>
+  <a class="sb-link" href="#sec-table" data-sec="sec-table"><span class="sb-idx">06</span>All funcs</a>
+  <a class="sb-link" href="#sec-recs" data-sec="sec-recs"><span class="sb-idx">07</span>Recommend</a>
+  <a class="sb-link" href="#sec-compare" data-sec="sec-compare"><span class="sb-idx">08</span>Side-by-side</a>
+  <div class="sb-hint">Explore the analysis first. Recommendations and compare are at the end.</div>
+</aside>
+
+<div class="app-main">
 <div class="shell" id="shell">
 
-  <!-- ─── HEADER ─── -->
+  <!-- ─── HEADER (slim) ─── -->
   <header class="topbar">
     <div class="brand">
       <div>
-        <h1>Plumb · Cost Dashboard</h1>
-        <div class="sub" id="metaLine">no data loaded · upload a results.json to begin</div>
+        <h1>Plumb</h1>
+        <div class="sub" id="metaLine">nothing loaded yet</div>
       </div>
     </div>
-
     <div class="toolbar">
-      <span class="run-pill" id="runPillA">A: —</span>
-      <label class="btn file-label">
-        Load JSON (A)
-        <input type="file" id="fileA" accept=".json" />
-      </label>
-      <span class="run-pill" id="runPillB">B: —</span>
-      <label class="btn file-label ghost">
-        Load JSON (B)
-        <input type="file" id="fileB" accept=".json" />
-      </label>
-      <button class="btn ghost"  id="loadDemo">Demo Data</button>
-
-      <!-- live-mode controls: only shown once validation_server.py is detected -->
-      <span class="toolbar-sep" id="liveSep" style="display:none;"></span>
-      <select class="func-select" id="serverTestcaseSelect" style="display:none;">
-        <option value="">— live: pick analyzed —</option>
-      </select>
-      <label class="btn file-label ghost" id="uploadCLabel" style="display:none;">
-        Analyze new .c (live)
-        <input type="file" id="uploadC" accept=".c,.cc,.cpp,.cxx" />
-      </label>
-      <span class="run-pill" id="serverStatus" style="display:none;">● connecting…</span>
-
-      <button class="btn accent" id="exportPdf">Export PDF</button>
+      <span class="top-status" id="serverStatus">offline</span>
+      <button class="btn accent" id="exportPdf" disabled title="Load a run first">Export PDF</button>
     </div>
   </header>
 
+  <!-- Hidden file inputs — triggered from welcome / source bar -->
+  <input type="file" id="fileA" accept=".json" hidden />
+  <input type="file" id="fileB" accept=".json" hidden />
+  <input type="file" id="uploadC" accept=".c,.cc,.cpp,.cxx" hidden />
+
   <!-- ─── EMPTY STATE ─── -->
   <div id="emptyState" class="card empty">
-    <div class="icon">[ ANALYSE ]</div>
-    <h2>Drop in a <code>results.json</code> to begin</h2>
-    <p>
-      Run the LLVM pass with <code>-json-file=results.json</code>, then load the file here.
-      You can load a second JSON (e.g. <code>-O2</code>) to enable side-by-side comparison.
-    </p>
-    <div class="actions">
-      <button class="btn primary" onclick="document.getElementById('fileA').click()">Upload Run A</button>
-      <button class="btn"          onclick="loadDemoData()">Load Demo Data</button>
+    <div class="icon">[ START ]</div>
+    <h2>Choose how to begin</h2>
+    <p>No data is preloaded. Pick one path below — you can change it anytime.</p>
+    <div class="welcome-grid">
+      <div class="welcome-card live-only" id="welcomeLiveCard">
+        <h3>1 · Pick an analyzed program</h3>
+        <p>Loads that one run. You pick which recommendation to compare afterward.</p>
+        <div class="wc-actions">
+          <select class="func-select" id="serverTestcaseSelect">
+            <option value="">Select program…</option>
+          </select>
+        </div>
+      </div>
+      <div class="welcome-card live-only" id="welcomeUploadCard">
+        <h3>2 · Analyze your .c file</h3>
+        <p>Compile + run Plumb live on a file you upload.</p>
+        <div class="wc-actions">
+          <button class="btn primary" type="button" id="uploadCBtn">Choose .c file</button>
+        </div>
+      </div>
+      <div class="welcome-card">
+        <h3>Load a results.json</h3>
+        <p>From a prior <code>./run.sh</code> — opens as the Before (A) view.</p>
+        <div class="wc-actions">
+          <button class="btn primary" type="button" id="loadJsonABtn">Load JSON</button>
+        </div>
+      </div>
+      <div class="welcome-card">
+        <h3>Try the demo</h3>
+        <p>Sample floatmm analysis only — then you pick a recommendation to compare.</p>
+        <div class="wc-actions">
+          <button class="btn ghost" type="button" id="loadDemo">Load demo</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ─── MAIN DASHBOARD (hidden until data loads) ─── -->
+  <!-- ─── MAIN DASHBOARD ─── -->
   <div id="dash" style="display:none;">
 
-    <!-- KPI ROW -->
-    <div class="kpis">
-      <div class="kpi k1"><div class="ribbon"></div>
-        <div class="label">Total Weighted Cost</div>
-        <div class="value" id="kpi-cost">0</div>
-        <div class="delta" id="kpi-cost-delta"></div>
+    <div class="source-bar" id="sourceBar">
+      <div class="sb-info">
+        Looking at <strong id="runPillA">—</strong>
+        <span id="runPillBWrap" style="display:none;"> · compared with <strong id="runPillB">—</strong></span>
       </div>
-      <div class="kpi k2"><div class="ribbon"></div>
-        <div class="label">Functions Analysed</div>
-        <div class="value" id="kpi-funcs">0</div>
-        <div class="delta" id="kpi-funcs-delta"></div>
-      </div>
-      <div class="kpi k3"><div class="ribbon"></div>
-        <div class="label">Hottest Function</div>
-        <div class="value" id="kpi-hot" style="font-size:22px;">—</div>
-        <div class="delta" id="kpi-hot-delta"></div>
-      </div>
-      <div class="kpi k4"><div class="ribbon"></div>
-        <div class="label">Estimated Energy</div>
-        <div class="value" id="kpi-energy">0<span class="unit"> nJ</span></div>
-        <div class="delta" id="kpi-energy-delta"></div>
+      <div class="sb-actions">
+        <button class="btn ghost" type="button" id="clearDataBtn">Start over</button>
       </div>
     </div>
+    <!-- keep ids for JS; hidden, not shown in UI -->
+    <select id="serverTestcaseSelectDash" hidden><option value=""></option></select>
+    <button type="button" id="uploadCBtnDash" hidden></button>
+    <button type="button" id="loadJsonABtnDash" hidden></button>
+    <button type="button" id="loadJsonBBtn" hidden></button>
 
-    <!-- COMPARISON TOGGLE (only shows when B loaded) -->
-    <div class="card" id="compareCard" style="display:none;">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Comparison Mode</div>
-        <div class="compare-toggle" id="compareToggle">
-          <button data-mode="A"     class="active">View A</button>
-          <button data-mode="B">View B</button>
-          <button data-mode="diff">Diff (A vs B)</button>
+    <section class="dash-section" id="sec-overview">
+      <div class="section-head">
+        <div>
+          <h2>Overview</h2>
+          <p>How expensive this IR is, at a glance.</p>
         </div>
       </div>
-      <div class="card-sub">A and B can be different optimisation levels (e.g. <strong>-O0</strong> vs <strong>-O2</strong>) or different builds.
-        Diff view shows reductions in green (B improved) and increases in red.</div>
-    </div>
+      <div class="kpis">
+        <div class="kpi k1"><div class="ribbon"></div>
+          <div class="label">Total Weighted Cost</div>
+          <div class="value" id="kpi-cost">0</div>
+          <div class="delta" id="kpi-cost-delta"></div>
+        </div>
+        <div class="kpi k2"><div class="ribbon"></div>
+          <div class="label">Functions Analysed</div>
+          <div class="value" id="kpi-funcs">0</div>
+          <div class="delta" id="kpi-funcs-delta"></div>
+        </div>
+        <div class="kpi k3"><div class="ribbon"></div>
+          <div class="label">Hottest Function</div>
+          <div class="value" id="kpi-hot" style="font-size:22px;">—</div>
+          <div class="delta" id="kpi-hot-delta"></div>
+        </div>
+        <div class="kpi k4"><div class="ribbon"></div>
+          <div class="label">Estimated Energy</div>
+          <div class="value" id="kpi-energy">0<span class="unit"> nJ</span></div>
+          <div class="delta" id="kpi-energy-delta"></div>
+        </div>
+      </div>
+    </section>
 
-    <!-- INSTRUCTION DONUT  +  FUNCTION RANKING -->
-    <div class="grid-2">
+    
+
+    
+
+    <section class="dash-section" id="sec-costs">
+      <div class="section-head">
+        <div>
+          <h2>Cost charts</h2>
+          <p>Where cost comes from, and which functions dominate.</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot"></span>Instruction-Type Distribution</div>
+            <div class="card-sub">aggregate over all functions in current view</div>
+          </div>
+          <div style="height:340px;position:relative;"><canvas id="donutChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot"></span>Function Ranking · Total Cost</div>
+            <div class="card-sub">click a bar to focus that function below</div>
+          </div>
+          <div style="height:340px;position:relative;"><canvas id="rankChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dash-section" id="sec-blocks">
+      <div class="section-head">
+        <div>
+          <h2>Hot blocks</h2>
+          <p>Per-basic-block cost and the worst-case critical path.</p>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="dot"></span>Instruction-Type Distribution</div>
-          <div class="card-sub">aggregate over all functions in current view</div>
+          <div class="card-title"><span class="dot"></span>BasicBlock Cost Heatmap</div>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <span class="card-sub">Function:</span>
+            <select class="func-select" id="funcSelect"></select>
+          </div>
         </div>
-        <div style="height:340px;position:relative;"><canvas id="donutChart"></canvas></div>
+        <div id="badgesRow" style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+        <div class="heatmap" id="heatmap"></div>
+        <div style="margin-top:18px;">
+          <div class="card-sub" style="margin-bottom:8px;">Critical Path (worst-case execution):</div>
+          <div class="path-strip" id="critPath"></div>
+        </div>
       </div>
+    </section>
 
+    <section class="dash-section" id="sec-cfg">
+      <div class="section-head">
+        <div>
+          <h2>Control-flow</h2>
+          <p>CFG with node size = cost. Critical path highlighted.</p>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header">
-          <div class="card-title"><span class="dot"></span>Function Ranking · Total Cost</div>
-          <div class="card-sub">click a bar to focus that function below</div>
+          <div class="card-title"><span class="dot"></span>Control-Flow Graph · cost-weighted</div>
+          <div class="card-sub">drag to pan, scroll to zoom</div>
         </div>
-        <div style="height:340px;position:relative;"><canvas id="rankChart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- BB HEATMAP  +  CRITICAL PATH -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>BasicBlock Cost Heatmap</div>
-        <div style="display:flex;gap:12px;align-items:center;">
-          <span class="card-sub">Function:</span>
-          <select class="func-select" id="funcSelect"></select>
+        <div id="cfg"></div>
+        <div class="cfg-legend">
+          <span><span class="legend-dot" style="background:#23252a;border:1px solid #34343a;"></span>cool</span>
+          <span><span class="legend-dot" style="background:#5e6ad2;"></span>medium</span>
+          <span><span class="legend-dot" style="background:#828fff;"></span>hot</span>
+          <span><span class="legend-dot" style="background:#5e6ad2;outline:2px solid #5e6ad2;outline-offset:1px;"></span>critical-path node</span>
         </div>
       </div>
-      <div id="badgesRow" style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap;"></div>
-      <div class="heatmap" id="heatmap"></div>
-      <div style="margin-top:18px;">
-        <div class="card-sub" style="margin-bottom:8px;">Critical Path (worst-case execution):</div>
-        <div class="path-strip" id="critPath"></div>
-      </div>
-    </div>
+    </section>
 
-    <!-- CFG GRAPH -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Control-Flow Graph · cost-weighted</div>
-        <div class="card-sub">node size = cost, red glow = critical path, drag to pan, scroll to zoom</div>
-      </div>
-      <div id="cfg"></div>
-      <div class="cfg-legend">
-        <span><span class="legend-dot" style="background:#23252a;border:1px solid #34343a;"></span>cool</span>
-        <span><span class="legend-dot" style="background:#5e6ad2;"></span>medium</span>
-        <span><span class="legend-dot" style="background:#828fff;"></span>hot</span>
-        <span><span class="legend-dot" style="background:#5e6ad2;outline:2px solid #5e6ad2;outline-offset:1px;"></span>critical-path node</span>
-      </div>
-    </div>
-
-    <!-- LIVE WEIGHT TUNER -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Live Weight Tuner</div>
-        <div style="display:flex;gap:10px;align-items:center;">
-          <span class="card-sub">drag any slider — every chart re-renders instantly</span>
-          <button class="btn ghost" id="resetWeights">Reset</button>
+    <section class="dash-section" id="sec-weights">
+      <div class="section-head">
+        <div>
+          <h2>Weight tuner</h2>
+          <p>What-if: drag a weight — charts re-score instantly (client-side).</p>
         </div>
       </div>
-      <div class="weight-grid" id="weightGrid"></div>
-    </div>
-
-    <!-- RECOMMENDATIONS -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Optimisation Recommendations</div>
-        <div class="card-sub">static analysis suggestions per function</div>
-      </div>
-      <div class="recs-grid" id="recsGrid"></div>
-      <div class="card-sub" id="validateHint" style="margin-top:12px;display:none;">Click <b>▶</b> on any tag above to validate it live — the real LLVM transform, run against this exact function.</div>
-    </div>
-
-    <!-- RECOMMENDATION VALIDATION (results land here when you click ▶ above) -->
-    <div class="card" id="validationCard">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>Recommendation Validation</div>
-        <div class="card-sub" id="validationSub">Checking for the live-validation server…</div>
-      </div>
-
-      <div id="validationResults" class="validation-grid">
-        <div class="card-sub">Pick or upload a program above to see a live before/after validation here.</div>
-      </div>
-
-      <!-- FALLBACK: no server — fixed case study on Plumb's own testcases only -->
-      <div id="validationFallback" style="display:none;">
-        <div class="val-repro" style="margin-bottom:16px;">
-          ⚠ Live-validation server isn't running, so this is <strong>not</strong> the file(s) loaded
-          above — it's Plumb's own pre-computed case study (<code>test_arith.c</code>,
-          <code>test_branchy.c</code>, <code>test_recursive.c</code>). Run
-          <code>./scripts/validation_server.sh</code> to validate live instead, against whatever
-          program you actually pick or upload above.
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>Live Weight Tuner</div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <button class="btn ghost" id="resetWeights">Reset</button>
+          </div>
         </div>
-        <div class="validation-grid" id="validationGrid"></div>
+        <div class="weight-grid" id="weightGrid"></div>
       </div>
+    </section>
 
-      <div class="val-repro">
-        Reproduce the fixed case study with one command: <code>./scripts/validate_recommendations.sh</code> — full write-up in <code>EVALUATION.md §6</code>.
-      </div>
-    </div>
+    
 
-    <!-- FUNCTION TABLE -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title"><span class="dot"></span>All Functions · Sortable</div>
-        <div class="card-sub">click a column header to sort</div>
+    <section class="dash-section" id="sec-table">
+      <div class="section-head">
+        <div>
+          <h2>All functions</h2>
+          <p>Sortable table. Click a row to focus the heatmap and CFG.</p>
+        </div>
       </div>
-      <div style="overflow-x:auto;">
-        <table class="ftable" id="ftable">
-          <thead>
-            <tr>
-              <th data-key="name">Function</th>
-              <th data-key="totalCost">Cost</th>
-              <th data-key="totalInstructions">Insts</th>
-              <th data-key="cyclomaticComplexity">CC</th>
-              <th data-key="maxLoopDepth">MaxDepth</th>
-              <th data-key="energyPj">Energy(nJ)</th>
-              <th data-key="criticalPathCost">CritPath</th>
-              <th>Tags</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>All Functions · Sortable</div>
+          <div class="card-sub">click a column header to sort</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="ftable" id="ftable">
+            <thead>
+              <tr>
+                <th data-key="name">Function</th>
+                <th data-key="totalCost">Cost</th>
+                <th data-key="totalInstructions">Insts</th>
+                <th data-key="cyclomaticComplexity">CC</th>
+                <th data-key="maxLoopDepth">MaxDepth</th>
+                <th data-key="energyPj">Energy(nJ)</th>
+                <th data-key="criticalPathCost">CritPath</th>
+                <th>Tags</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <section class="dash-section" id="sec-recs">
+      <div class="section-head">
+        <div>
+          <h2>Recommendations</h2>
+          <p>Now that you&apos;ve seen the costs — pick one tag to test. Side-by-side appears after you click Compare.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>Your choice</div>
+          <div class="card-sub" id="recsSub">Select one option below</div>
+        </div>
+        <div id="recPicker" class="rec-picker"></div>
+        <div class="rec-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button class="btn primary" id="compareRecBtn" disabled>Compare this side-by-side</button>
+          <span class="card-sub" id="validateHint">Needs the live server + a selected recommendation.</span>
+        </div>
+        <div id="validationResults" class="validation-grid" style="margin-top:16px;"></div>
+        <div id="validationFallback" style="display:none;margin-top:16px;">
+          <div class="val-repro" style="margin-bottom:16px;">
+            Live server offline — you can still browse tags, but side-by-side validate needs
+            <code>./scripts/validation_server.sh</code>.
+          </div>
+          <div class="validation-grid" id="validationGrid"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="dash-section" id="sec-compare">
+      <div class="section-head">
+        <div>
+          <h2>Side-by-side</h2>
+          <p>Shows up only after <em>you</em> pick a recommendation and click Compare.</p>
+        </div>
+      </div>
+      <div class="compare-banner" id="compareBanner"></div>
+      <div class="card" id="compareCard" style="display:none;">
+        <div class="card-header">
+          <div class="card-title"><span class="dot"></span>Side-by-side comparison</div>
+          <div class="compare-toggle" id="compareToggle">
+            <button data-mode="A">Charts: Before</button>
+            <button data-mode="B">Charts: After</button>
+            <button data-mode="diff" class="active">Charts: Diff</button>
+          </div>
+        </div>
+        <div class="card-sub">Left = Before · Right = After. Green = cheaper after. Red = more expensive after. Toggle only changes the charts below.</div>
+        <div class="sbs-grid" id="sbsGrid">
+          <div class="sbs-col before">
+            <div class="sbs-label">Before</div>
+            <div class="sbs-title" id="sbsLabelA">—</div>
+            <div class="sbs-metric"><div class="sm-label">Total cost</div><div class="sm-val" id="sbsCostA">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Functions</div><div class="sm-val" id="sbsFuncsA" style="font-size:22px;">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Hottest function</div><div class="sm-val" id="sbsHotA" style="font-size:18px;">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Energy</div><div class="sm-val" id="sbsEnergyA" style="font-size:22px;">—</div></div>
+          </div>
+          <div class="sbs-mid">
+            <div class="arrow">→</div>
+            <div class="delta-big" id="sbsDeltaBig">—</div>
+          </div>
+          <div class="sbs-col after">
+            <div class="sbs-label">After</div>
+            <div class="sbs-title" id="sbsLabelB">—</div>
+            <div class="sbs-metric"><div class="sm-label">Total cost</div><div class="sm-val" id="sbsCostB">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Functions</div><div class="sm-val" id="sbsFuncsB" style="font-size:22px;">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Hottest function</div><div class="sm-val" id="sbsHotB" style="font-size:18px;">—</div></div>
+            <div class="sbs-metric"><div class="sm-label">Energy</div><div class="sm-val" id="sbsEnergyB" style="font-size:22px;">—</div></div>
+          </div>
+        </div>
+        <div class="sbs-table-wrap">
+          <table class="sbs-table" id="sbsTable">
+            <thead>
+              <tr>
+                <th>Function</th>
+                <th>Before cost</th>
+                <th>After cost</th>
+                <th>Change</th>
+                <th>Before tags</th>
+                <th>After tags</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="sbs-empty" id="sbsEmpty">
+        Nothing compared yet. Scroll up to <strong>Recommendations</strong>, pick one,
+        then click <strong>Compare</strong>.
+      </div>
+    </section>
+
 
   </div><!-- #dash -->
 
   <footer class="foot">
-    Plumb · LLVM-IR cost analysis<br/>
-    static weight + critical-path + recommendations
+    Plumb · LLVM-IR cost analysis — weight × loop depth × critical path
   </footer>
 </div><!-- .shell -->
+</div><!-- .app-main -->
 
 <div id="tt" class="tooltip"></div>
 
@@ -777,7 +1108,8 @@ const STATE = {
   mode: 'A',         // 'A' | 'B' | 'diff'
   charts: { donut:null, rank:null },
   cy: null,
-  sortKey: 'totalCost', sortDir: 'desc'
+  sortKey: 'totalCost', sortDir: 'desc',
+  recSelection: null  // { function, tag } — what the user picked to compare
 };
 
 const GROUPS = ["add","mul","memory","call","branch","compare","cast","alloca","phi","other"];
@@ -815,9 +1147,11 @@ function loadFile(ev, slot) {
     try {
       const json = JSON.parse(reader.result);
       validate(json);
-      if (slot === 'A') STATE.rawA = json;
-      else              STATE.rawB = json;
+      if (slot === 'A') { STATE.rawA = json; STATE.mode = 'A'; }
+      else              { STATE.rawB = json; if (STATE.rawA) STATE.mode = 'diff'; }
+      setCompareBanner('', false);
       onDataLoaded();
+      syncCompareToggleUI();
     } catch (e) {
       alert("Invalid JSON: " + e.message);
     }
@@ -832,8 +1166,13 @@ function validate(j) {
 
 function loadDemoData() {
   STATE.rawA = DEMO_A;
-  STATE.rawB = DEMO_B;
+  STATE.rawB = null; // you pick a recommendation — we do not auto-compare
+  STATE.mode = 'A';
+  STATE._userPickedMode = false;
+  setCompareBanner('', false);
   onDataLoaded();
+  syncCompareToggleUI();
+  document.getElementById('sec-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function onDataLoaded() {
@@ -846,17 +1185,28 @@ function onDataLoaded() {
   STATE.workA       = recompute(STATE.rawA, STATE.weights);
   STATE.workB       = STATE.rawB ? recompute(STATE.rawB, STATE.weights) : null;
 
-  const labelA = STATE.rawA.metadata.runLabel || 'A';
-  document.getElementById('runPillA').textContent = 'A: ' + labelA;
+  const labelA = STATE.rawA.metadata.runLabel || 'this run';
+  const prog = (SERVER.testcase ? `${SERVER.testcase} (${SERVER.level})` : null);
+  document.getElementById('runPillA').textContent = prog || labelA;
+  const wrap = document.getElementById('runPillBWrap');
   if (STATE.rawB) {
-    document.getElementById('runPillB').textContent = 'B: ' + (STATE.rawB.metadata.runLabel || 'B');
+    document.getElementById('runPillB').textContent = STATE.rawB.metadata.runLabel || 'after';
+    if (wrap) wrap.style.display = '';
     document.getElementById('compareCard').style.display = '';
+    const emp = document.getElementById('sbsEmpty');
+    if (emp) emp.style.display = 'none';
+    if (STATE.mode === 'A' && !STATE._userPickedMode) STATE.mode = 'diff';
   } else {
-    document.getElementById('runPillB').textContent = 'B: —';
+    document.getElementById('runPillB').textContent = '—';
+    if (wrap) wrap.style.display = 'none';
     document.getElementById('compareCard').style.display = 'none';
+    const emp = document.getElementById('sbsEmpty');
+    if (emp) emp.style.display = '';
   }
   document.getElementById('emptyState').style.display = 'none';
   document.getElementById('dash').style.display = '';
+  const exp = document.getElementById('exportPdf');
+  if (exp) { exp.disabled = false; exp.removeAttribute('title'); }
 
   document.getElementById('metaLine').textContent =
     `module: ${STATE.rawA.metadata.module || '?'} · ` +
@@ -951,6 +1301,7 @@ function findFunc(name, data) {
    REFRESH ALL VISUALISATIONS
    ═══════════════════════════════════════════════════════════════ */
 function refreshAll() {
+  renderSideBySide();
   // Diff mode's recommendations panel is built by renderDiffMode(), not
   // refreshRecs() (which explicitly no-ops in diff mode) — dispatch here
   // so every caller of refreshAll() (weight sliders, resetWeights, a new
@@ -1324,74 +1675,182 @@ function resetWeights() {
 function bindCompareToggle() {
   document.querySelectorAll('#compareToggle button').forEach(btn => {
     btn.onclick = () => {
-      document.querySelectorAll('#compareToggle button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      STATE._userPickedMode = true;
       STATE.mode = btn.dataset.mode;
+      syncCompareToggleUI();
       if (STATE.mode === 'diff') renderDiffMode();
       else refreshAll();
     };
   });
 }
+
+function hottestName(data) {
+  if (!data?.functions?.length) return '—';
+  let hot = data.functions[0];
+  for (const f of data.functions) if (f.totalCost > hot.totalCost) hot = f;
+  return hot.name;
+}
+
+function renderSideBySide() {
+  const card = document.getElementById('compareCard');
+  const A = STATE.workA, B = STATE.workB;
+  if (!card || !A || !B) return;
+
+  const sum = (data, key='totalCost') => data.functions.reduce((s,f)=>s+(f[key]||0), 0);
+  const costA = sum(A), costB = sum(B);
+  const enA = sum(A,'energyPj')/1000, enB = sum(B,'energyPj')/1000;
+  const d = costB - costA;
+  const pc = costA ? (d/costA*100) : 0;
+  const cls = d <= 0 ? 'diff-pos' : 'diff-neg';
+  const sign = d >= 0 ? '+' : '';
+
+  document.getElementById('sbsLabelA').textContent = STATE.rawA.metadata.runLabel || 'Before';
+  document.getElementById('sbsLabelB').textContent = STATE.rawB.metadata.runLabel || 'After';
+  document.getElementById('sbsCostA').textContent = fmt(costA, 0);
+  document.getElementById('sbsCostB').textContent = fmt(costB, 0);
+  document.getElementById('sbsFuncsA').textContent = A.functions.length;
+  document.getElementById('sbsFuncsB').textContent = B.functions.length;
+  document.getElementById('sbsHotA').textContent = hottestName(A);
+  document.getElementById('sbsHotB').textContent = hottestName(B);
+  document.getElementById('sbsEnergyA').innerHTML = fmt(enA, 1) + '<span class="unit"> nJ</span>';
+  document.getElementById('sbsEnergyB').innerHTML = fmt(enB, 1) + '<span class="unit"> nJ</span>';
+  document.getElementById('sbsDeltaBig').innerHTML =
+    `<span class="${cls}">${sign}${fmt(d,0)}</span><br><span class="${cls}">${sign}${pc.toFixed(1)}%</span>`;
+
+  const mapB = new Map(B.functions.map(f => [f.name, f]));
+  const mapA = new Map(A.functions.map(f => [f.name, f]));
+  const names = [...new Set([...mapA.keys(), ...mapB.keys()])];
+  names.sort((x, y) => {
+    const ax = mapA.get(x)?.totalCost ?? -1, ay = mapA.get(y)?.totalCost ?? -1;
+    if (ay !== ax) return ay - ax;
+    return (mapB.get(y)?.totalCost ?? 0) - (mapB.get(x)?.totalCost ?? 0);
+  });
+
+  const tbody = document.querySelector('#sbsTable tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (const name of names) {
+    const a = mapA.get(name), b = mapB.get(name);
+    const ca = a ? a.totalCost : null, cb = b ? b.totalCost : null;
+    let changeHtml = '—';
+    if (ca != null && cb != null) {
+      const dd = cb - ca;
+      const pp = ca ? (dd/ca*100).toFixed(1) : '0';
+      const c = dd <= 0 ? 'diff-pos' : 'diff-neg';
+      const s = dd >= 0 ? '+' : '';
+      changeHtml = `<span class="${c}">${s}${dd} (${s}${pp}%)</span>`;
+    } else if (ca == null) {
+      changeHtml = '<span class="diff-pos">new</span>';
+    } else {
+      changeHtml = '<span class="diff-pos">removed</span>';
+    }
+    const tags = (f) => (f?.recommendations||[]).map(r =>
+      `<span class="chip ${recClass(r)}" style="font-size:10px;padding:2px 7px;">${r}</span>`).join(' ') || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b style="font-family:'JetBrains Mono',ui-monospace,monospace">${name}</b></td>
+      <td class="num">${ca ?? '—'}</td>
+      <td class="num">${cb ?? '—'}</td>
+      <td class="num">${changeHtml}</td>
+      <td>${tags(a)}</td>
+      <td>${tags(b)}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
 function renderDiffMode() {
-  // Show A as primary; recommendations card lists per-function diff
+  renderSideBySide();
   refreshKPIs();
   refreshDonut(); refreshRankBar(); refreshFuncSelect();
   refreshHeatmap(); refreshCFG();
   refreshTable();
-  // Special diff recommendations panel
-  const A = STATE.workA, B = STATE.workB;
-  const map = new Map(B.functions.map(f => [f.name, f]));
-  const grid = document.getElementById('recsGrid');
-  grid.innerHTML = '';
-  for (const a of A.functions) {
-    const b = map.get(a.name);
-    if (!b) continue;
-    const d = b.totalCost - a.totalCost;
-    const pc = a.totalCost ? (d/a.totalCost*100).toFixed(1) : '0';
-    const cls = d <= 0 ? 'diff-pos' : 'diff-neg';
-    const sign = d >= 0 ? '+' : '';
-    const card = document.createElement('div');
-    card.className = 'rec-card';
-    card.innerHTML = `
-      <div class="fname">${a.name}</div>
-      <div class="meta">A cost: ${a.totalCost} · B cost: ${b.totalCost}</div>
-      <div class="meta">A insts: ${a.totalInstructions} · B insts: ${b.totalInstructions}</div>
-      <div class="meta" style="margin-top:6px;font-size:14px;">
-        Δ cost: <span class="${cls}">${sign}${d} (${sign}${pc}%)</span>
+  // Keep the recommendation picker visible so the user can choose another.
+  refreshRecs();
+}
+
+/* ── RECOMMENDATIONS — user picks one, then compares ── */
+function refreshRecs() {
+  const picker = document.getElementById('recPicker');
+  const btn = document.getElementById('compareRecBtn');
+  const hint = document.getElementById('validateHint');
+  if (!picker) return;
+
+  const canValidate = SERVER.available && SERVER.testcase && SERVER.level;
+  const data = STATE.workA || activeData();
+  if (!data) { picker.innerHTML = ''; return; }
+
+  const options = [];
+  for (const f of data.functions) {
+    for (const r of (f.recommendations || [])) {
+      options.push({ function: f.name, tag: r, cost: f.totalCost, insts: f.totalInstructions });
+    }
+  }
+
+  if (!options.length) {
+    picker.innerHTML = '<div class="card-sub">No recommendations on this program.</div>';
+    if (btn) btn.disabled = true;
+    if (hint) hint.textContent = 'Nothing to compare.';
+    return;
+  }
+
+  picker.innerHTML = '';
+  options.forEach((opt, i) => {
+    const id = `recopt-${i}`;
+    const selected = STATE.recSelection
+      && STATE.recSelection.function === opt.function
+      && STATE.recSelection.tag === opt.tag;
+    const row = document.createElement('label');
+    row.className = 'rec-option' + (selected ? ' selected' : '');
+    row.htmlFor = id;
+    row.innerHTML = `
+      <input type="radio" name="recPick" id="${id}" ${selected ? 'checked' : ''} />
+      <div class="ro-body">
+        <div class="ro-title">
+          <span class="chip ${recClass(opt.tag)}">${opt.tag}</span>
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace">${opt.function}</span>
+        </div>
+        <div class="ro-meta">cost ${opt.cost} · ${opt.insts} instructions — select this, then click Compare</div>
       </div>`;
-    grid.appendChild(card);
+    row.querySelector('input').addEventListener('change', () => {
+      STATE.recSelection = { function: opt.function, tag: opt.tag };
+      picker.querySelectorAll('.rec-option').forEach(el => el.classList.remove('selected'));
+      row.classList.add('selected');
+      updateCompareRecBtn();
+    });
+    picker.appendChild(row);
+  });
+
+  updateCompareRecBtn();
+}
+
+function updateCompareRecBtn() {
+  const btn = document.getElementById('compareRecBtn');
+  const hint = document.getElementById('validateHint');
+  const canValidate = SERVER.available && SERVER.testcase && SERVER.level;
+  const hasSel = !!(STATE.recSelection && STATE.recSelection.function && STATE.recSelection.tag);
+  if (btn) {
+    btn.disabled = !(canValidate && hasSel);
+    btn.textContent = hasSel
+      ? `Compare ${STATE.recSelection.tag} on ${STATE.recSelection.function}`
+      : 'Compare this side-by-side';
+  }
+  if (hint) {
+    if (!SERVER.available)
+      hint.textContent = 'Live server offline — start ./scripts/validation_server.sh';
+    else if (!SERVER.testcase)
+      hint.textContent = 'Pick a program from the start screen first (not just a JSON file).';
+    else if (!hasSel)
+      hint.textContent = 'Select one recommendation above.';
+    else
+      hint.textContent = 'Ready — this runs the real LLVM transform, then opens side-by-side.';
   }
 }
 
-/* ── RECOMMENDATIONS ── */
-function refreshRecs() {
-  if (STATE.mode === 'diff') return; // handled in renderDiffMode
-  const grid = document.getElementById('recsGrid');
-  // Validate buttons only make sense when the currently-loaded data came
-  // through the live picker/upload (SERVER.testcase/level set) — a plain
-  // "Load JSON (A)" of some arbitrary file has no known IR on the server
-  // to run opt against, so it stays a plain, non-interactive chip.
-  const canValidate = SERVER.available && SERVER.testcase && SERVER.level;
-  grid.innerHTML = '';
-  for (const f of activeData().functions) {
-    const card = document.createElement('div');
-    card.className = 'rec-card';
-    const badges = (f.recommendations || []).map(r =>
-      canValidate
-        ? `<button class="chip ${recClass(r)}" onclick="runLiveValidation('${f.name}','${r}')" title="Validate this live against the real opt transform">${r} ▶</button>`
-        : `<span class="chip ${recClass(r)}">${r}</span>`
-    ).join('');
-    card.innerHTML = `
-      <div class="fname">${f.name}</div>
-      <div class="badges">${badges || '<span class="chip">no flags</span>'}</div>
-      <div class="meta">cost ${f.totalCost} · insts ${f.totalInstructions} · CC ${f.cyclomaticComplexity}</div>
-      <div class="meta">crit-path ${f.criticalPathCost} · loops ${f.loopCount} (max depth ${f.maxLoopDepth})</div>
-      <div class="meta">energy ≈ ${(f.energyPj/1000).toFixed(2)} nJ · hottest group: <b style="color:${GROUP_COLORS[f.mostExpensiveGroup]||'#fff'}">${f.mostExpensiveGroup}</b></div>`;
-    grid.appendChild(card);
-  }
-  const hint = document.getElementById('validateHint');
-  if (hint) hint.style.display = canValidate ? '' : 'none';
-}
+document.getElementById('compareRecBtn')?.addEventListener('click', async () => {
+  if (!STATE.recSelection) return;
+  const { function: fn, tag } = STATE.recSelection;
+  await runLiveValidation(fn, tag);
+});
 
 /* ═══════════════════════════════════════════════════════════════
    RECOMMENDATION VALIDATION — always-visible proof section.
@@ -1488,65 +1947,139 @@ function renderValidationSection() {
    ═══════════════════════════════════════════════════════════════ */
 const SERVER = { available: false, testcase: null, level: null };
 
+function setCompareBanner(html, show) {
+  const el = document.getElementById('compareBanner');
+  if (!el) return;
+  el.innerHTML = html || '';
+  el.classList.toggle('show', !!show);
+}
+
+function syncCompareToggleUI() {
+  document.querySelectorAll('#compareToggle button').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === STATE.mode);
+  });
+}
+
+/** Load before/after Plumb JSON into A/B and jump to Diff view. */
+function applyBeforeAfterCompare(before, after, meta) {
+  if (!before || !after) return false;
+  STATE.rawA = before;
+  STATE.rawB = after;
+  STATE.mode = 'diff';
+  onDataLoaded();
+  syncCompareToggleUI();
+  const tag = (meta && meta.tag) || 'transform';
+  const fn = (meta && meta.function) || '';
+  setCompareBanner(`
+    <strong>Your pick:</strong> <code>${tag}</code>${fn ? ' on <code>'+fn+'</code>' : ''} —
+    side-by-side Before vs After is ready below.
+    <div class="cb-actions">
+      <button class="btn ghost" onclick="document.getElementById('sec-recs').scrollIntoView({behavior:'smooth'})">Pick another</button>
+    </div>
+  `, true);
+  document.getElementById('sec-compare')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return true;
+}
+
+function setLiveUI(on) {
+  document.body.classList.toggle('live-on', !!on);
+  const st = document.getElementById('serverStatus');
+  if (st) {
+    st.textContent = on ? 'live' : 'offline';
+    st.classList.toggle('live', !!on);
+  }
+  // program change lives on the start screen only
+}
+
 async function initServerMode() {
-  const liveEls = ['liveSep', 'serverTestcaseSelect', 'uploadCLabel', 'serverStatus']
-    .map(id => document.getElementById(id));
   try {
     const res = await fetch('/api/testcases');
     if (!res.ok) throw new Error('server responded ' + res.status);
     const data = await res.json();
     SERVER.available = true;
-    liveEls.forEach(el => el.style.display = '');
+    setLiveUI(true);
     document.getElementById('validationFallback').style.display = 'none';
-    document.getElementById('validationSub').textContent =
-      'Live — pick an analyzed program or upload a new one from the header, then validate any of its tags for real.';
-    document.getElementById('serverStatus').textContent = '● connected';
+    updateCompareRecBtn();
     populateServerPicker(data.testcases);
-    // Auto-select test_floatmm to match the DEMO_A/DEMO_B already on
-    // screen, so live mode is fully populated — charts AND a real
-    // validation result — with zero clicks, not just an empty panel
-    // waiting for input.
-    const defaultEntry = data.testcases.find(t => t.testcase === 'test_floatmm' && t.level === 'O0');
-    if (defaultEntry) {
-      const sel = document.getElementById('serverTestcaseSelect');
-      sel.value = JSON.stringify({ testcase: 'test_floatmm', level: 'O0' });
-      await loadServerTestcase('test_floatmm', 'O0');
-    }
+    // Intentionally do NOT auto-load a program — wait for the user.
   } catch (e) {
     SERVER.available = false;
-    liveEls.forEach(el => el.style.display = 'none');
+    setLiveUI(false);
     document.getElementById('validationFallback').style.display = '';
-    document.getElementById('validationSub').textContent =
-      'Fixed case study — live-validation server not running (see banner below).';
+    updateCompareRecBtn();
     renderValidationSection();
   }
-  refreshRecs(); // re-render so Validate buttons appear/disappear based on SERVER.available
 }
 
 function populateServerPicker(testcases) {
-  const sel = document.getElementById('serverTestcaseSelect');
-  const prev = sel.value;
-  sel.innerHTML = '<option value="">— pick one —</option>';
-  for (const tc of testcases) {
-    const opt = document.createElement('option');
-    opt.value = JSON.stringify({ testcase: tc.testcase, level: tc.level });
-    opt.textContent = `${tc.testcase} (${tc.level})` + (tc.source === 'upload' ? ' · uploaded' : '');
-    sel.appendChild(opt);
+  for (const id of ['serverTestcaseSelect', 'serverTestcaseSelectDash']) {
+    const sel = document.getElementById(id);
+    if (!sel) continue;
+    const prev = sel.value;
+    const placeholder = id === 'serverTestcaseSelectDash' ? 'Change program…' : 'Select program…';
+    sel.innerHTML = `<option value="">${placeholder}</option>`;
+    for (const tc of testcases) {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify({ testcase: tc.testcase, level: tc.level });
+      opt.textContent = `${tc.testcase} (${tc.level})` + (tc.source === 'upload' ? ' · uploaded' : '');
+      sel.appendChild(opt);
+    }
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
   }
-  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
-document.getElementById('serverTestcaseSelect').addEventListener('change', async e => {
-  if (!e.target.value) return;
-  const { testcase, level } = JSON.parse(e.target.value);
-  await loadServerTestcase(testcase, level);
-});
+function bindProgramSelect(id) {
+  const sel = document.getElementById(id);
+  if (!sel || sel.dataset.bound) return;
+  sel.dataset.bound = '1';
+  sel.addEventListener('change', async e => {
+    if (!e.target.value) return;
+    const { testcase, level } = JSON.parse(e.target.value);
+    await loadServerTestcase(testcase, level);
+    // keep both selects in sync
+    for (const other of ['serverTestcaseSelect', 'serverTestcaseSelectDash']) {
+      const o = document.getElementById(other);
+      if (o && o !== e.target) o.value = e.target.value;
+    }
+  });
+}
+bindProgramSelect('serverTestcaseSelect');
+bindProgramSelect('serverTestcaseSelectDash');
+
+document.getElementById('uploadCBtn')?.addEventListener('click', () => document.getElementById('uploadC').click());
+document.getElementById('uploadCBtnDash')?.addEventListener('click', () => document.getElementById('uploadC').click());
+document.getElementById('loadJsonABtn')?.addEventListener('click', () => document.getElementById('fileA').click());
+document.getElementById('loadJsonABtnDash')?.addEventListener('click', () => document.getElementById('fileA').click());
+document.getElementById('loadJsonBBtn')?.addEventListener('click', () => document.getElementById('fileB').click());
+document.getElementById('clearDataBtn')?.addEventListener('click', clearLoadedData);
+
+function clearLoadedData() {
+  STATE.rawA = null; STATE.rawB = null; STATE.workA = null; STATE.workB = null;
+  STATE.mode = 'A'; STATE.selectedFunc = null; STATE.recSelection = null;
+  SERVER.testcase = null; SERVER.level = null;
+  setCompareBanner('', false);
+  document.getElementById('emptyState').style.display = '';
+  document.getElementById('dash').style.display = 'none';
+  document.getElementById('metaLine').textContent = 'nothing loaded yet';
+  document.getElementById('runPillA').textContent = '—';
+  document.getElementById('runPillB').textContent = '—';
+  const wrap = document.getElementById('runPillBWrap');
+  if (wrap) wrap.style.display = 'none';
+  const exp = document.getElementById('exportPdf');
+  if (exp) { exp.disabled = true; exp.title = 'Load a run first'; }
+  for (const id of ['serverTestcaseSelect', 'serverTestcaseSelectDash']) {
+    const sel = document.getElementById(id);
+    if (sel) sel.value = '';
+  }
+  const box = document.getElementById('validationResults');
+  if (box) box.innerHTML = '<div class="card-sub">Load a program, then Validate a recommendation chip.</div>';
+}
 
 document.getElementById('uploadC').addEventListener('change', async e => {
   const file = e.target.files[0];
   if (!file) return;
   const status = document.getElementById('serverStatus');
-  status.textContent = '● compiling…';
+  if (status) { status.textContent = 'compiling…'; status.classList.remove('live'); }
   try {
     const source = await file.text();
     const res = await fetch('/api/upload', {
@@ -1555,14 +2088,18 @@ document.getElementById('uploadC').addEventListener('change', async e => {
     });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    status.textContent = '● connected';
+    setLiveUI(true);
     const list = await fetch('/api/testcases').then(r => r.json());
     populateServerPicker(list.testcases);
-    document.getElementById('serverTestcaseSelect').value =
-      JSON.stringify({ testcase: data.testcase, level: 'O0' });
+    const v = JSON.stringify({ testcase: data.testcase, level: 'O0' });
+    for (const id of ['serverTestcaseSelect', 'serverTestcaseSelectDash']) {
+      const sel = document.getElementById(id);
+      if (sel) sel.value = v;
+    }
     await loadServerTestcase(data.testcase, 'O0');
   } catch (err) {
-    status.textContent = '● error';
+    setLiveUI(SERVER.available);
+    if (status && SERVER.available) { status.textContent = 'live'; status.classList.add('live'); }
     alert('Upload/compile failed: ' + err.message);
   } finally {
     e.target.value = '';
@@ -1574,43 +2111,22 @@ async function loadServerTestcase(testcase, level) {
   const json = await res.json();
   if (json.error) { alert(json.error); return; }
   SERVER.testcase = testcase; SERVER.level = level;
-  // Feed it through the EXACT same path as a manual "Load JSON (A)" upload,
-  // so the whole dashboard (KPIs, charts, heatmap, CFG, table, and now the
-  // Validate buttons on Optimisation Recommendations) reacts to whatever
-  // was picked/uploaded — one load path, one place tags (and their Validate
-  // actions) live.
+  setCompareBanner('', false);
+  STATE.mode = 'A';
+  STATE._userPickedMode = false;
+  STATE.recSelection = null;
+
+  // Load ONLY what the user picked. Side-by-side waits until they choose
+  // a recommendation and click Compare.
   validate(json);
   STATE.rawA = json;
+  STATE.rawB = null;
   onDataLoaded();
-  autoValidateSample(json.functions);
-}
+  syncCompareToggleUI();
 
-/* Auto-run a real validation the moment a program loads, instead of
-   waiting for a click — one example per distinct recommendation tag
-   present (so a program with 20 HOTSPOT functions still only fires 5
-   opt calls, not 20), sequentially since the server is single-threaded.
-   Manual ▶ buttons on Optimisation Recommendations still work for
-   anything not covered by this sample, or to re-run one. */
-async function autoValidateSample(functions) {
-  const seen = new Set();
-  const sample = [];
-  for (const f of functions) {
-    for (const tag of f.recommendations || []) {
-      if (seen.has(tag)) continue;
-      seen.add(tag);
-      sample.push([f.name, tag]);
-    }
-  }
   const box = document.getElementById('validationResults');
-  if (!sample.length) {
-    box.innerHTML = '<div class="card-sub">No recommendation tags on this program to validate.</div>';
-    return;
-  }
-  box.innerHTML = `<div class="card-sub" id="autoValLoading">Auto-validating ${sample.length} example(s) live — one per tag present…</div>`;
-  for (const [fn, tag] of sample) {
-    await runLiveValidation(fn, tag);
-  }
-  document.getElementById('autoValLoading')?.remove();
+  if (box) box.innerHTML = '';
+  document.getElementById('sec-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function runLiveValidation(functionName, tag) {
@@ -1621,7 +2137,8 @@ async function runLiveValidation(functionName, tag) {
   placeholder.id = cardId;
   placeholder.innerHTML = `
     <div class="val-head"><span class="val-tag">${tag} · ${functionName}</span><span class="verdict limitation">Running…</span></div>
-    <div class="val-action">Shelling out to the real <code>opt</code> now — give it a second.</div>`;
+    <div class="val-action">Applying the real <code>opt</code> transform — then loading Before vs After Diff.</div>`;
+  resultsBox.innerHTML = '';
   resultsBox.prepend(placeholder);
 
   try {
@@ -1630,9 +2147,15 @@ async function runLiveValidation(functionName, tag) {
       body: JSON.stringify({ testcase: SERVER.testcase, level: SERVER.level, function: functionName, tag })
     });
     const data = await res.json();
-    document.getElementById(cardId).outerHTML = renderLiveResultCard(data);
+    const card = document.getElementById(cardId);
+    if (card) card.outerHTML = renderLiveResultCard(data);
+
+    if (data.compare_available && data.before_report && data.after_report) {
+      applyBeforeAfterCompare(data.before_report, data.after_report, data);
+    }
   } catch (e) {
-    document.getElementById(cardId).outerHTML = renderLiveResultCard({ error: e.message, tag, function: functionName });
+    const card = document.getElementById(cardId);
+    if (card) card.outerHTML = renderLiveResultCard({ error: e.message, tag, function: functionName });
   }
 }
 
@@ -1640,6 +2163,9 @@ function renderLiveResultCard(d) {
   if (d.error) {
     return `<div class="val-card"><div class="val-head"><span class="val-tag">${d.tag || ''} · ${d.function || ''}</span><span class="verdict up">Error</span></div><div class="val-action">${d.error}</div></div>`;
   }
+  const compareNote = d.compare_available
+    ? `<div class="val-note">Full Before vs After Diff is open in the Compare section above.</div>`
+    : '';
   if (d.tag === 'HIGH_COMPLEXITY') {
     return `<div class="val-card">
       <div class="val-head"><span class="val-tag">HIGH_COMPLEXITY · ${d.function}</span><span class="verdict limitation">Not automatable</span></div>
@@ -1652,11 +2178,11 @@ function renderLiveResultCard(d) {
       .join('');
     return `<div class="val-card">
       <div class="val-head"><span class="val-tag">INLINE_CANDIDATE · ${d.function}</span><span class="verdict validated">Live result</span></div>
-      <div class="val-action">Force-inlined <code>${d.function}</code> with real <code>-always-inline</code>, measured with and without cleanup passes.</div>
+      <div class="val-action">Force-inlined <code>${d.function}</code> with real <code>-always-inline</code> + cleanup.</div>
       ${valMetric('module cost — raw inline only', d.before_total, d.after_raw_total)}
       ${valMetric('module cost — inline + cleanup', d.before_total, d.after_cleaned_total)}
-      <div class="val-note">${d.remaining_calls} remaining call site(s) to ${d.function}. Functions whose cost changed:</div>
-      ${changed}
+      <div class="val-note">${d.remaining_calls} remaining call site(s) to ${d.function}.</div>
+      ${changed}${compareNote}
     </div>`;
   }
   if (d.tag === 'VECTORIZABLE') {
@@ -1667,6 +2193,7 @@ function renderLiveResultCard(d) {
       <div class="val-metric"><span class="vm-label">vector instructions</span><span class="vm-num">${d.vector_instructions}</span>
         <span class="vm-delta ${d.verdict === 'vectorized' ? 'down' : 'flat'}">${d.verdict === 'vectorized' ? 'VECTORIZED' : 'declined by real vectorizer'}</span></div>
       ${valMetric('cost', d.before_cost, d.after_cost)}
+      ${compareNote}
     </div>`;
   }
   if (d.tag === 'RECURSIVE') {
@@ -1675,18 +2202,43 @@ function renderLiveResultCard(d) {
       <div class="val-action">Ran real <code>-tailcallelim</code> on <code>${d.function}</code>.</div>
       <div class="val-metric"><span class="vm-label">self-calls</span><span class="vm-num">${d.before_calls}</span><span class="vm-arrow">→</span><span class="vm-num">${d.after_calls}</span>
         <span class="vm-delta flat">${d.verdict}</span></div>
+      ${compareNote}
     </div>`;
   }
   if (d.tag === 'HOTSPOT') {
     return `<div class="val-card">
       <div class="val-head"><span class="val-tag">HOTSPOT · ${d.function}</span><span class="verdict ${d.resolved ? 'validated' : 'partial'}">Live result</span></div>
-      <div class="val-action">Compared ${d.function} at ${d.this_level} against its own ${d.other_level} outcome.</div>
+      <div class="val-action">Compared ${d.function} at ${d.this_level} vs ${d.other_level}.</div>
       <div class="val-metric"><span class="vm-label">${d.this_level} → ${d.other_level} cost</span><span class="vm-num">${d.this_cost}</span><span class="vm-arrow">→</span><span class="vm-num">${d.other_cost}</span></div>
-      <div class="val-note">${d.resolved ? 'Resolved by the other optimization level alone.' : 'Still HOTSPOT at the other level — needs more than a compiler flag.'}</div>
+      <div class="val-note">${d.resolved ? 'Resolved by the other optimization level alone.' : 'Still HOTSPOT at the other level.'}</div>
+      ${compareNote}
     </div>`;
   }
   return `<div class="val-card">Unrecognized result shape.</div>`;
 }
+
+/* ── Sidebar nav ── */
+(function initSidebarNav() {
+  const toggle = document.getElementById('navToggle');
+  const sidebar = document.getElementById('sidebar');
+  if (toggle && sidebar) {
+    toggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+    sidebar.querySelectorAll('a.sb-link').forEach(a => {
+      a.addEventListener('click', () => {
+        if (window.matchMedia('(max-width: 1100px)').matches) sidebar.classList.remove('open');
+      });
+    });
+  }
+  const links = [...document.querySelectorAll('.sidebar a.sb-link')];
+  const secs = links.map(a => document.getElementById(a.dataset.sec)).filter(Boolean);
+  const observer = new IntersectionObserver((entries) => {
+    const visible = entries.filter(e => e.isIntersecting).sort((a,b) => b.intersectionRatio - a.intersectionRatio)[0];
+    if (!visible) return;
+    const id = visible.target.id;
+    links.forEach(a => a.classList.toggle('active', a.dataset.sec === id));
+  }, { rootMargin: '-20% 0px -55% 0px', threshold: [0, 0.2, 0.5] });
+  secs.forEach(s => observer.observe(s));
+})();
 
 /* ── FUNCTION TABLE ── */
 function bindTableSort() {
@@ -1803,7 +2355,7 @@ const DEMO_A = {
     "version": "2.0",
     "runLabel": "O0",
     "module": "ir/test_floatmm.O0.ll",
-    "timestamp": "2026-07-14T02:25:32Z",
+    "timestamp": "2026-07-14T02:39:43Z",
     "hotThreshold": 30,
     "inlineThreshold": 20,
     "weights": {
@@ -2409,7 +2961,7 @@ const DEMO_B = {
     "version": "2.0",
     "runLabel": "O2",
     "module": "ir/test_floatmm.O2.ll",
-    "timestamp": "2026-07-14T02:25:32Z",
+    "timestamp": "2026-07-14T02:39:43Z",
     "hotThreshold": 30,
     "inlineThreshold": 20,
     "weights": {
@@ -3034,13 +3586,7 @@ const VALIDATION_DATA = {
 };
 /* VALIDATION_DATA_END */
 
-// Auto-load real captured output on open (DEMO_A/DEMO_B are genuine
-// test_floatmm results, not synthetic — see DEMO_DATA_BEGIN above) so
-// the dashboard shows something real immediately, whether that's a
-// local file:// open or the hosted GitHub Pages copy. Loading your own
-// results.json (or, in live mode, picking/uploading a program) simply
-// replaces this.
-loadDemoData();
+// Start empty — user picks demo / JSON / live program. No auto-preload.
 initServerMode();
 </script>
 </body>

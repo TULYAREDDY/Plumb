@@ -127,6 +127,13 @@ def _scratch_tag(testcase, level, function):
     return f"{testcase}_{level}_{function}_{int(time.time() * 1000)}"
 
 
+def label_report(report, label):
+    """Deep-copy a Plumb JSON and set metadata.runLabel for dashboard A/B pills."""
+    out = json.loads(json.dumps(report))
+    out.setdefault("metadata", {})["runLabel"] = label
+    return out
+
+
 def diff_functions(before, after):
     b = {f["name"]: f["totalCost"] for f in before["functions"]}
     a = {f["name"]: f["totalCost"] for f in after["functions"]}
@@ -163,6 +170,9 @@ def validate_inline_candidate(testcase, level, function):
         "after_cleaned_total": after_cleaned["metadata"]["totals"]["totalCost"],
         "remaining_calls": lib.call_count(lib.read(cleaned_ll), function),
         "changed_functions": diff_functions(before, after_cleaned),
+        "compare_available": True,
+        "before_report": label_report(before, f"Before · {function}"),
+        "after_report": label_report(after_cleaned, f"After inline+cleanup · {function}"),
     }
 
 
@@ -186,11 +196,14 @@ def validate_vectorizable(testcase, level, function):
         "before_cost": b["totalCost"] if b else None,
         "after_cost": a["totalCost"] if a else None,
         "verdict": "vectorized" if vec_insts > 0 else "declined",
+        "compare_available": True,
+        "before_report": label_report(before, f"Before · {function}"),
+        "after_report": label_report(after, f"After vectorize · {function}"),
     }
 
 
 def validate_recursive(testcase, level, function):
-    ll_path, _ = ll_and_json_paths(testcase, level)
+    ll_path, json_path = ll_and_json_paths(testcase, level)
     src = lib.read(ll_path)
     tag = _scratch_tag(testcase, level, function)
     cleaned = lib.strip_blocking_attrs(src)
@@ -200,12 +213,17 @@ def validate_recursive(testcase, level, function):
     tce_ir = lib.opt_run(lib.TAILCALLELIM_PASSES, clean_path, tce_path)
     before_calls = lib.self_call_count(cleaned, function)
     after_calls = lib.self_call_count(tce_ir, function)
+    before = json.load(open(json_path))
+    after = lib.plumb_run(tce_path, os.path.join(SCRATCH_DIR, f"{tag}_tce.json"), "tailcallelim")
     return {
         "tag": "RECURSIVE",
         "function": function,
         "before_calls": before_calls,
         "after_calls": after_calls,
         "verdict": "eliminated" if after_calls == 0 else "survives",
+        "compare_available": True,
+        "before_report": label_report(before, f"Before · {function}"),
+        "after_report": label_report(after, f"After -tailcallelim · {function}"),
     }
 
 
@@ -227,6 +245,9 @@ def validate_hotspot(testcase, level, function):
         "this_cost": this_f["totalCost"] if this_f else None,
         "other_cost": other_f["totalCost"] if other_f else "gone (inlined away entirely)",
         "resolved": resolved,
+        "compare_available": True,
+        "before_report": label_report(this_report, level),
+        "after_report": label_report(other_report, other_level),
     }
 
 
@@ -235,6 +256,7 @@ def validate_high_complexity(testcase, level, function):
         "tag": "HIGH_COMPLEXITY",
         "function": function,
         "automatable": False,
+        "compare_available": False,
         "message": ("No LLVM pass rewrites a switch/if-ladder into a lower-complexity "
                     "equivalent — that's a manual, code-specific refactor. See "
                     "EVALUATION.md §6.5 for a worked example (categorize → "
