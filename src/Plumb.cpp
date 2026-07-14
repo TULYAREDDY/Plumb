@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <ctime>
+#include <cmath>
+#include <cmath>
 
 using namespace llvm;
 
@@ -57,7 +59,7 @@ static cl::opt<int> HotThreshold(
     "plumb-hot-threshold",
     cl::desc("[Plumb] warn if a function total cost exceeds this value"),
     cl::value_desc("N"),
-    cl::init(50)
+    cl::init(30)
 );
 
 static cl::opt<std::string> OutputFile(
@@ -150,6 +152,8 @@ static std::vector<FuncInfo>            g_funcs;
 static std::map<std::string, long>      g_funcRank;
 static std::vector<std::string>         g_csvLines;
 static std::map<std::string, int>       g_weightsUsed;
+static std::map<std::string, int>       g_weightsCached;
+static bool                             g_weightsLoaded = false;
 
 // ═══════════════════════════════════════════════════════════════
 //  WEIGHT TABLE LOADER
@@ -201,7 +205,7 @@ static std::map<std::string, int> loadWeights(const std::string &path) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  INSTRUCTION CLASSIFIER  — 9 groups + direct/indirect calls
+//  INSTRUCTION CLASSIFIER  — 10 groups (add..other) + direct/indirect calls
 // ═══════════════════════════════════════════════════════════════
 
 struct ClassifyResult {
@@ -443,10 +447,22 @@ struct Plumb : public FunctionPass {
         AU.setPreservesAll();
     }
 
+    bool doInitialization(Module &M) override {
+        (void)M;
+        g_weightsCached = loadWeights(WeightFile);
+        g_weightsLoaded = true;
+        g_weightsUsed = g_weightsCached;
+        return false;
+    }
+
     bool runOnFunction(Function &F) override {
         if (F.isDeclaration()) return false;
 
-        std::map<std::string, int> weights = loadWeights(WeightFile);
+        if (!g_weightsLoaded) {
+            g_weightsCached = loadWeights(WeightFile);
+            g_weightsLoaded = true;
+        }
+        std::map<std::string, int> weights = g_weightsCached;
         g_weightsUsed = weights;
 
         LoopInfo &LI = getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
@@ -489,7 +505,7 @@ struct Plumb : public FunctionPass {
                 int baseWeight = weights.count(group) ? weights[group] : 0;
                 int effectiveWeight = baseWeight;
                 if (group == "call" && CR.isIndirectCall)
-                    effectiveWeight = (int)(baseWeight * 1.6);
+                    effectiveWeight = (int)std::lround(baseWeight * 1.6);
 
                 long cost = (long)effectiveWeight * depthMul;
 
@@ -918,6 +934,8 @@ struct Plumb : public FunctionPass {
         g_csvLines.clear();
         g_funcs.clear();
         g_weightsUsed.clear();
+        g_weightsCached.clear();
+        g_weightsLoaded = false;
         return false;
     }
 };

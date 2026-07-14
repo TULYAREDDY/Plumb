@@ -58,7 +58,7 @@ for the rationale (we want a profile-free, deterministic model).
 
 `classifyInst(const Instruction&)` returns a `{group, isIndirectCall}`
 pair. The classifier is a single switch on `Instruction::getOpcode()`
-that buckets opcodes into 9 groups:
+that buckets opcodes into 10 groups:
 
 | Group | LLVM opcodes |
 |---|---|

@@ -19,6 +19,10 @@
 ./build.sh && ./run.sh
 ```
 
+`./run.sh` analyses the testcases, then starts the **live** dashboard at
+`http://localhost:8420/dashboard.html` (so recommendation Compare works).
+Use `./run.sh --no-open` in CI, or `./run.sh --file` for a plain `file://` open.
+
 </div>
 
 ---
@@ -62,7 +66,7 @@ Every cost number traces back to `(group, count, weight, depth)` — no black-bo
 ### What you get
 
 - LLVM `FunctionPass` (legacy PM)
-- Per-instruction classification into 9 groups
+- Per-instruction classification into 10 groups
 - Configurable weights (`config/weights.cfg`)
 - Loop-depth cost multiplier
 - Indirect-call ×1.6 surcharge
@@ -121,7 +125,7 @@ Inside the pass itself, each function is processed through a fixed sequence of s
   <img src="docs/diagrams/cost-model.png" alt="Cost model: classify, look up weight, apply indirect-call surcharge, multiply by loop depth, sum across basic blocks" width="700" />
 </div>
 
-### The 9 groups (with default weights)
+### The 10 groups (with default weights)
 
 | Group | Weight | Energy¹ pJ/op | LLVM opcodes |
 |---|:-:|:-:|---|
@@ -439,7 +443,7 @@ All flags use the `plumb-` prefix to avoid clashing with LLVM's own command-line
 | Flag | Default | Purpose |
 |---|---|---|
 | `-plumb-weight-file=PATH`        | *(built-in)* | Path to `key=value` weight table |
-| `-plumb-hot-threshold=N`         | `50`         | Functions with cost > N get `HOTSPOT` |
+| `-plumb-hot-threshold=N`         | `30`         | Functions with cost > N get `HOTSPOT` |
 | `-plumb-inline-threshold=N`      | `20`         | Cost < N (and not `main`) gets `INLINE_CANDIDATE` |
 | `-plumb-out-file=PATH`           | —            | Write CSV results |
 | `-plumb-json-file=PATH`          | —            | Write structured JSON |

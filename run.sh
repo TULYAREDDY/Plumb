@@ -6,8 +6,9 @@
 #   results/<name>.{O0,O2}.csv  CSV breakdown
 #   results/<name>.{O0,O2}.json structured JSON for the dashboard
 #
-# Then opens dashboard/dashboard.html in your default browser.
-# Use `./run.sh --no-open` to skip the browser launch (useful in CI).
+# Opens the LIVE validation dashboard (so recommendation Compare works).
+# Use `./run.sh --no-open` to skip the browser / server (CI-friendly).
+# Use `./run.sh --file` to open dashboard.html as file:// only (offline).
 # ──────────────────────────────────────────────────────────────────────────
 set -e
 
@@ -17,12 +18,15 @@ cd "$ROOT"
 source "$ROOT/scripts/_llvm_env.sh"
 
 OPEN_DASHBOARD=1
+OPEN_MODE=live   # live | file
 for arg in "$@"; do
   case "$arg" in
     --no-open) OPEN_DASHBOARD=0 ;;
+    --file)    OPEN_MODE=file ;;
     -h|--help)
-      echo "Usage: $0 [--no-open]"
-      echo "  --no-open   build & analyse only; do not open the dashboard"
+      echo "Usage: $0 [--no-open] [--file]"
+      echo "  --no-open   analyse only; do not open the dashboard / server"
+      echo "  --file      open dashboard.html as file:// (no live Validate)"
       exit 0 ;;
   esac
 done
@@ -43,8 +47,6 @@ WEIGHTS="$ROOT/config/weights.cfg"
 banner "Compiling testcases to LLVM IR (-O0 and -O2)"
 mkdir -p ir results
 
-# enumerate testcases/*.c — sorted, so demo output is reproducible.
-# (avoid bash 4 mapfile so this works on stock macOS bash 3.2 too)
 TEST_FILES=()
 while IFS= read -r f; do TEST_FILES+=("$f"); done < <(find "$ROOT/testcases" -maxdepth 1 -name '*.c' | sort)
 [ "${#TEST_FILES[@]}" -gt 0 ] || die "no testcases found in testcases/"
@@ -82,33 +84,33 @@ if [ "$FAIL_COUNT" -gt 0 ]; then
   echo -e "${RED}${FAIL_COUNT} (testcase, opt-level) pair(s) failed — results/ is incomplete, see above.${OFF}"
 fi
 
-# ── keep the dashboard's built-in demo data honest (real output, not
-#    hand-typed numbers) — same reproducibility bar as VALIDATION_DATA ──
+# Keep embedded DEMO_* fixtures honest for offline “built-in sample”
 python3 "$ROOT/scripts/_embed_demo_data.py" "$ROOT"
-
-# ── open the dashboard ──────────────────────────────────────────────────
-DEFAULT_A="results/test_floatmm.O0.json"
-DEFAULT_B="results/test_floatmm.O2.json"
-[ -f "$DEFAULT_A" ] || DEFAULT_A="results/test_arith.O0.json"
-[ -f "$DEFAULT_B" ] || DEFAULT_B="results/test_arith.O2.json"
 
 banner "Done"
 echo -e "${GREEN}Generated reports:${OFF}"
 ls -1 results/*.json 2>/dev/null | sed 's/^/  /'
 echo
-echo -e "${B}Dashboard:${OFF}  $ROOT/dashboard/dashboard.html"
-echo -e "${B}Suggested:${OFF}  load A = ${DEFAULT_A}"
-echo -e "             load B = ${DEFAULT_B}"
-echo
+
+[ "$FAIL_COUNT" -eq 0 ] || {
+  echo -e "${RED}${FAIL_COUNT} analysis failure(s) — not opening dashboard.${OFF}"
+  exit 1
+}
 
 if [ "$OPEN_DASHBOARD" = 1 ]; then
-  if command -v open >/dev/null 2>&1; then
-    open "$ROOT/dashboard/dashboard.html"
-  elif command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "$ROOT/dashboard/dashboard.html" >/dev/null 2>&1 &
+  if [ "$OPEN_MODE" = "live" ]; then
+    echo -e "${B}Dashboard (live):${OFF}  http://localhost:8420/dashboard.html"
+    echo -e "  Recommendation Compare requires this live server."
+    echo
+    exec "$ROOT/scripts/validation_server.sh"
   else
-    echo -e "${YEL}(no browser launcher found — open dashboard/dashboard.html manually)${OFF}"
+    echo -e "${B}Dashboard (file):${OFF}  $ROOT/dashboard/dashboard.html"
+    echo -e "${YEL}Note:${OFF} file:// cannot Validate recommendations — use ./scripts/validation_server.sh"
+    echo
+    if command -v open >/dev/null 2>&1; then
+      open "$ROOT/dashboard/dashboard.html"
+    elif command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$ROOT/dashboard/dashboard.html" >/dev/null 2>&1 &
+    fi
   fi
 fi
-
-[ "$FAIL_COUNT" -eq 0 ] || exit 1

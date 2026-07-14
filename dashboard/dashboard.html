@@ -133,6 +133,18 @@ header.topbar{
 .welcome-card p{font-size:12px;color:var(--ink-subtle);line-height:1.45;margin:0;flex:1;}
 .welcome-card .wc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .welcome-card.live-only{display:none;}
+.welcome-card.history{grid-column:1 / -1;}
+.hist-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px;}
+.hist-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin-top:8px;}
+.hist-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:12px 12px;border-radius:10px;border:1px solid var(--hairline);background:var(--canvas);
+}
+.hist-row .hist-meta{min-width:0;flex:1;}
+.hist-row .hist-title{font-size:13px;font-weight:600;color:var(--ink);}
+.hist-row .hist-sub{font-size:11px;color:var(--ink-tertiary);margin-top:3px;font-family:'JetBrains Mono',ui-monospace,monospace;}
+.hist-row .hist-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.hist-empty{font-size:12px;color:var(--ink-tertiary);padding:8px 2px;}
 body.live-on .welcome-card.live-only{display:flex;}
 .source-bar{
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
@@ -780,11 +792,11 @@ table.sbs-table tr:hover td{background:var(--surface-2);}
   <div id="emptyState" class="card empty">
     <div class="icon">[ START ]</div>
     <h2>Choose how to begin</h2>
-    <p>No data is preloaded. Pick one path below — you can change it anytime.</p>
+    <p>Live: pick a demo or upload C. Anytime: History, Import JSON, or the built-in sample.</p>
     <div class="welcome-grid">
       <div class="welcome-card live-only" id="welcomeLiveCard">
-        <h3>1 · Pick an analyzed program</h3>
-        <p>Loads that one run. You pick which recommendation to compare afterward.</p>
+        <h3>1 · Pick a program</h3>
+        <p>Built-in demos the server already analyzed.</p>
         <div class="wc-actions">
           <select class="func-select" id="serverTestcaseSelect">
             <option value="">Select program…</option>
@@ -793,23 +805,21 @@ table.sbs-table tr:hover td{background:var(--surface-2);}
       </div>
       <div class="welcome-card live-only" id="welcomeUploadCard">
         <h3>2 · Analyze your .c file</h3>
-        <p>Compile + run Plumb live on a file you upload.</p>
+        <p>Upload your C code — compile + Plumb, then it lands in History.</p>
         <div class="wc-actions">
           <button class="btn primary" type="button" id="uploadCBtn">Choose .c file</button>
         </div>
       </div>
-      <div class="welcome-card">
-        <h3>Load a results.json</h3>
-        <p>From a prior <code>./run.sh</code> — opens as the Before (A) view.</p>
-        <div class="wc-actions">
-          <button class="btn primary" type="button" id="loadJsonABtn">Load JSON</button>
+      <div class="welcome-card history" id="welcomeHistoryCard">
+        <h3>3 · History &amp; samples</h3>
+        <p>Past runs in this browser. Import JSON, load/delete entries, or open the built-in floatmm sample (works offline).</p>
+        <div class="hist-toolbar">
+          <button class="btn primary" type="button" id="loadJsonABtn">Import JSON</button>
+          <button class="btn ghost" type="button" id="loadBuiltInDemo">Built-in sample</button>
+          <button class="btn ghost" type="button" id="clearHistoryBtn">Clear all history</button>
         </div>
-      </div>
-      <div class="welcome-card">
-        <h3>Try the demo</h3>
-        <p>Sample floatmm analysis only — then you pick a recommendation to compare.</p>
-        <div class="wc-actions">
-          <button class="btn ghost" type="button" id="loadDemo">Load demo</button>
+        <div class="hist-list" id="historyList">
+          <div class="hist-empty">Nothing saved yet.</div>
         </div>
       </div>
     </div>
@@ -824,14 +834,13 @@ table.sbs-table tr:hover td{background:var(--surface-2);}
         <span id="runPillBWrap" style="display:none;"> · compared with <strong id="runPillB">—</strong></span>
       </div>
       <div class="sb-actions">
+        <button class="btn ghost" type="button" id="loadJsonBBtn" title="Optionally load a second JSON (e.g. O2) for manual compare">Import After (B)</button>
         <button class="btn ghost" type="button" id="clearDataBtn">Start over</button>
       </div>
     </div>
-    <!-- keep ids for JS; hidden, not shown in UI -->
     <select id="serverTestcaseSelectDash" hidden><option value=""></option></select>
     <button type="button" id="uploadCBtnDash" hidden></button>
     <button type="button" id="loadJsonABtnDash" hidden></button>
-    <button type="button" id="loadJsonBBtn" hidden></button>
 
     <section class="dash-section" id="sec-overview">
       <div class="section-head">
@@ -857,16 +866,13 @@ table.sbs-table tr:hover td{background:var(--surface-2);}
           <div class="delta" id="kpi-hot-delta"></div>
         </div>
         <div class="kpi k4"><div class="ribbon"></div>
-          <div class="label">Estimated Energy</div>
+          <div class="label">Op-energy (no depth)</div>
           <div class="value" id="kpi-energy">0<span class="unit"> nJ</span></div>
           <div class="delta" id="kpi-energy-delta"></div>
         </div>
       </div>
+      <div class="card-sub" style="margin-top:8px;">Note: GEP / select / phi often cost 0 in the default weight table — memory weight dominates address-heavy code.</div>
     </section>
-
-    
-
-    
 
     <section class="dash-section" id="sec-costs">
       <div class="section-head">
@@ -1130,12 +1136,170 @@ const GROUP_COLORS = {
   other  :'#23252a'   /* hairline */
 };
 
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORY — browser-local log of analyzed / imported reports
+   ═══════════════════════════════════════════════════════════════ */
+const HISTORY_KEY = 'plumb.history.v1';
+const HISTORY_MAX = 20;
+
+function readHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (_) { return []; }
+}
+
+function writeHistory(list) {
+  const trimmed = list.slice(0, HISTORY_MAX);
+  // Drop basicBlocks from oldest entries if still too large (~4MB budget)
+  const pack = (entries) => JSON.stringify(entries.map(e => {
+    if (!e.report) return e;
+    const r = JSON.parse(JSON.stringify(e.report));
+    // Keep full newest; strip BB detail from older to save space
+    return e;
+  }));
+  try {
+    let payload = pack(trimmed);
+    if (payload.length > 3_500_000) {
+      // strip basicBlocks from all but first 5
+      const slim = trimmed.map((e, i) => {
+        if (i < 5 || !e.report) return e;
+        const r = JSON.parse(JSON.stringify(e.report));
+        for (const f of (r.functions || [])) f.basicBlocks = [];
+        return { ...e, report: r };
+      });
+      payload = JSON.stringify(slim);
+    }
+    localStorage.setItem(HISTORY_KEY, payload.length > 4_500_000 ? JSON.stringify(slimSlice(trimmed)) : payload);
+  } catch (e) {
+    alert('Could not save history (browser storage full). Delete old entries or Clear all history.');
+    console.warn('history save failed', e);
+  }
+}
+function slimSlice(list) {
+  return list.slice(0, 10).map(e => {
+    if (!e.report) return e;
+    const r = JSON.parse(JSON.stringify(e.report));
+    for (const f of (r.functions || [])) f.basicBlocks = [];
+    return { ...e, report: r };
+  });
+}
+
+function historyTitle(meta) {
+  if (meta.title) return meta.title;
+  if (meta.testcase) return `${meta.testcase} (${meta.level || '?'})`;
+  return (meta.report?.metadata?.module) || 'Untitled run';
+}
+
+/** Save (or refresh) a history entry containing the full report JSON. */
+function saveToHistory(meta) {
+  if (!meta?.report?.functions) return;
+  const list = readHistory();
+  const title = historyTitle(meta);
+  const id = meta.id || `${meta.kind || 'run'}:${meta.testcase || title}:${meta.level || ''}:${Date.now()}`;
+  // Drop older duplicate of same program+level or same title+kind
+  const filtered = list.filter(e => {
+    if (meta.testcase && e.testcase === meta.testcase && e.level === meta.level) return false;
+    if (!meta.testcase && e.title === title && e.kind === (meta.kind || 'import')) return false;
+    return true;
+  });
+  filtered.unshift({
+    id,
+    title,
+    kind: meta.kind || 'import',
+    testcase: meta.testcase || null,
+    level: meta.level || null,
+    savedAt: new Date().toISOString(),
+    report: meta.report
+  });
+  writeHistory(filtered);
+  renderHistoryList();
+}
+
+function deleteHistoryEntry(id) {
+  writeHistory(readHistory().filter(e => e.id !== id));
+  renderHistoryList();
+}
+
+function clearAllHistory() {
+  if (!readHistory().length) return;
+  if (!confirm('Delete all history entries on this browser?')) return;
+  writeHistory([]);
+  renderHistoryList();
+}
+
+function loadHistoryEntry(id) {
+  const entry = readHistory().find(e => e.id === id);
+  if (!entry?.report) { alert('History entry missing data'); return; }
+  try { validate(entry.report); } catch (e) { alert(e.message); return; }
+  STATE.rawA = entry.report;
+  STATE.rawB = null;
+  STATE.mode = 'A';
+  STATE._userPickedMode = false;
+  STATE.recSelection = null;
+  setCompareBanner('', false);
+  if (entry.testcase && entry.level && SERVER.available) {
+    SERVER.testcase = entry.testcase;
+    SERVER.level = entry.level;
+    const v = JSON.stringify({ testcase: entry.testcase, level: entry.level });
+    for (const sid of ['serverTestcaseSelect', 'serverTestcaseSelectDash']) {
+      const sel = document.getElementById(sid);
+      if (sel) sel.value = v;
+    }
+  } else {
+    // imported JSON — recommendation Compare needs live program IR
+    SERVER.testcase = entry.testcase || null;
+    SERVER.level = entry.level || null;
+  }
+  onDataLoaded();
+  syncCompareToggleUI();
+  document.getElementById('sec-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderHistoryList() {
+  const box = document.getElementById('historyList');
+  if (!box) return;
+  const list = readHistory();
+  if (!list.length) {
+    box.innerHTML = '<div class="hist-empty">Nothing saved yet. Analyze a program/upload, or Import JSON.</div>';
+    return;
+  }
+  box.innerHTML = '';
+  for (const e of list) {
+    const when = e.savedAt ? new Date(e.savedAt).toLocaleString() : '';
+    const kind = e.kind === 'program' ? 'demo' : e.kind === 'upload' ? 'upload' : 'import';
+    const row = document.createElement('div');
+    row.className = 'hist-row';
+    row.innerHTML = `
+      <div class="hist-meta">
+        <div class="hist-title">${escapeHtml(e.title)}</div>
+        <div class="hist-sub">${kind} · ${when}</div>
+      </div>
+      <div class="hist-actions">
+        <button class="btn primary" type="button" data-act="load">Load</button>
+        <button class="btn ghost" type="button" data-act="del">Delete</button>
+      </div>`;
+    row.querySelector('[data-act=load]').onclick = () => loadHistoryEntry(e.id);
+    row.querySelector('[data-act=del]').onclick = () => {
+      if (confirm(`Delete “${e.title}” from history?`)) deleteHistoryEntry(e.id);
+    };
+    box.appendChild(row);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+  ));
+}
+
 /* ═══════════════════════════════════════════════════════════════
    FILE LOADING
    ═══════════════════════════════════════════════════════════════ */
 document.getElementById('fileA').addEventListener('change', e => loadFile(e, 'A'));
 document.getElementById('fileB').addEventListener('change', e => loadFile(e, 'B'));
-document.getElementById('loadDemo').addEventListener('click', loadDemoData);
 document.getElementById('exportPdf').addEventListener('click', exportPdf);
 document.getElementById('resetWeights').addEventListener('click', resetWeights);
 
@@ -1147,8 +1311,17 @@ function loadFile(ev, slot) {
     try {
       const json = JSON.parse(reader.result);
       validate(json);
-      if (slot === 'A') { STATE.rawA = json; STATE.mode = 'A'; }
-      else              { STATE.rawB = json; if (STATE.rawA) STATE.mode = 'diff'; }
+      if (slot === 'A') {
+        STATE.rawA = json; STATE.mode = 'A'; STATE.rawB = null;
+        SERVER.testcase = null; SERVER.level = null; STATE.recSelection = null;
+        saveToHistory({
+          kind: 'import',
+          title: file.name.replace(/\.json$/i, ''),
+          report: json
+        });
+      } else {
+        STATE.rawB = json; if (STATE.rawA) STATE.mode = 'diff';
+      }
       setCompareBanner('', false);
       onDataLoaded();
       syncCompareToggleUI();
@@ -1160,20 +1333,16 @@ function loadFile(ev, slot) {
 }
 
 function validate(j) {
-  if (!j.metadata || !Array.isArray(j.functions))
+  if (!j || !j.metadata || !Array.isArray(j.functions))
     throw new Error("Missing metadata or functions[] — was the pass run with -json-file?");
+  if (!j.metadata.weights)
+    throw new Error("Missing metadata.weights — not a Plumb results.json");
+  for (const f of j.functions) {
+    if (!f.name || !Array.isArray(f.groups) || !Array.isArray(f.basicBlocks))
+      throw new Error(`Function ${f.name || '?'} missing groups[] or basicBlocks[]`);
+  }
 }
 
-function loadDemoData() {
-  STATE.rawA = DEMO_A;
-  STATE.rawB = null; // you pick a recommendation — we do not auto-compare
-  STATE.mode = 'A';
-  STATE._userPickedMode = false;
-  setCompareBanner('', false);
-  onDataLoaded();
-  syncCompareToggleUI();
-  document.getElementById('sec-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
 
 function onDataLoaded() {
   if (!STATE.rawA && STATE.rawB) STATE.rawA = STATE.rawB; // promote B → A
@@ -1551,6 +1720,10 @@ function recClass(r) {
   if (r === 'HIGH_COMPLEXITY')  return 'complex';
   return '';
 }
+function recLabel(r) {
+  if (r === 'VECTORIZABLE') return 'VECTORIZABLE?';
+  return r;
+}
 function heatColor(t) {
   // 0..1 → near-canvas dark → lavender → bright lavender (Linear's
   // single-accent system: intensity ramp on one hue, no rainbow).
@@ -1806,10 +1979,10 @@ function refreshRecs() {
       <input type="radio" name="recPick" id="${id}" ${selected ? 'checked' : ''} />
       <div class="ro-body">
         <div class="ro-title">
-          <span class="chip ${recClass(opt.tag)}">${opt.tag}</span>
-          <span style="font-family:'JetBrains Mono',ui-monospace,monospace">${opt.function}</span>
+          <span class="chip ${recClass(opt.tag)}">${recLabel(opt.tag)}</span>
+          <span style="font-family:'JetBrains Mono',ui-monospace,monospace">${escapeHtml(opt.function)}</span>
         </div>
-        <div class="ro-meta">cost ${opt.cost} · ${opt.insts} instructions — select this, then click Compare</div>
+        <div class="ro-meta">cost ${opt.cost} · ${opt.insts} instructions${opt.tag === 'VECTORIZABLE' ? ' · heuristic (LLVM may decline)' : ''} — select, then Compare</div>
       </div>`;
     row.querySelector('input').addEventListener('change', () => {
       STATE.recSelection = { function: opt.function, tag: opt.tag };
@@ -2049,6 +2222,28 @@ bindProgramSelect('serverTestcaseSelectDash');
 document.getElementById('uploadCBtn')?.addEventListener('click', () => document.getElementById('uploadC').click());
 document.getElementById('uploadCBtnDash')?.addEventListener('click', () => document.getElementById('uploadC').click());
 document.getElementById('loadJsonABtn')?.addEventListener('click', () => document.getElementById('fileA').click());
+document.getElementById('clearHistoryBtn')?.addEventListener('click', clearAllHistory);
+document.getElementById('loadBuiltInDemo')?.addEventListener('click', loadBuiltInDemo);
+
+function loadBuiltInDemo() {
+  if (typeof DEMO_A === 'undefined') {
+    alert('Built-in sample missing — run ./run.sh --no-open to refresh fixtures.');
+    return;
+  }
+  STATE.rawA = DEMO_A;
+  STATE.rawB = null;
+  STATE.mode = 'A';
+  STATE._userPickedMode = false;
+  STATE.recSelection = null;
+  SERVER.testcase = null;
+  SERVER.level = null;
+  setCompareBanner('', false);
+  saveToHistory({ kind: 'import', title: 'built-in floatmm (O0)', report: DEMO_A });
+  onDataLoaded();
+  syncCompareToggleUI();
+  document.getElementById('sec-overview')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 document.getElementById('loadJsonABtnDash')?.addEventListener('click', () => document.getElementById('fileA').click());
 document.getElementById('loadJsonBBtn')?.addEventListener('click', () => document.getElementById('fileB').click());
 document.getElementById('clearDataBtn')?.addEventListener('click', clearLoadedData);
@@ -2072,7 +2267,8 @@ function clearLoadedData() {
     if (sel) sel.value = '';
   }
   const box = document.getElementById('validationResults');
-  if (box) box.innerHTML = '<div class="card-sub">Load a program, then Validate a recommendation chip.</div>';
+  if (box) box.innerHTML = '';
+  renderHistoryList();
 }
 
 document.getElementById('uploadC').addEventListener('change', async e => {
@@ -2096,6 +2292,7 @@ document.getElementById('uploadC').addEventListener('change', async e => {
       const sel = document.getElementById(id);
       if (sel) sel.value = v;
     }
+    STATE._lastUploadName = data.testcase;
     await loadServerTestcase(data.testcase, 'O0');
   } catch (err) {
     setLiveUI(SERVER.available);
@@ -2121,6 +2318,10 @@ async function loadServerTestcase(testcase, level) {
   validate(json);
   STATE.rawA = json;
   STATE.rawB = null;
+  saveToHistory({
+    kind: (STATE._lastUploadName === testcase) ? 'upload' : 'program',
+    testcase, level, report: json
+  });
   onDataLoaded();
   syncCompareToggleUI();
 
@@ -2160,36 +2361,38 @@ async function runLiveValidation(functionName, tag) {
 }
 
 function renderLiveResultCard(d) {
+  const tag = escapeHtml(d.tag || '');
+  const fn = escapeHtml(d.function || '');
   if (d.error) {
-    return `<div class="val-card"><div class="val-head"><span class="val-tag">${d.tag || ''} · ${d.function || ''}</span><span class="verdict up">Error</span></div><div class="val-action">${d.error}</div></div>`;
+    return `<div class="val-card"><div class="val-head"><span class="val-tag">${tag} · ${fn}</span><span class="verdict up">Error</span></div><div class="val-action">${escapeHtml(d.error)}</div></div>`;
   }
   const compareNote = d.compare_available
-    ? `<div class="val-note">Full Before vs After Diff is open in the Compare section above.</div>`
+    ? `<div class="val-note">Side-by-side for your pick is open under Side-by-side.</div>`
     : '';
   if (d.tag === 'HIGH_COMPLEXITY') {
     return `<div class="val-card">
-      <div class="val-head"><span class="val-tag">HIGH_COMPLEXITY · ${d.function}</span><span class="verdict limitation">Not automatable</span></div>
-      <div class="val-action">${d.message}</div>
+      <div class="val-head"><span class="val-tag">HIGH_COMPLEXITY · ${fn}</span><span class="verdict limitation">Not automatable</span></div>
+      <div class="val-action">${escapeHtml(d.message || '')}</div>
     </div>`;
   }
   if (d.tag === 'INLINE_CANDIDATE') {
     const changed = (d.changed_functions || []).slice(0, 6)
-      .map(c => `<div class="val-metric"><span class="vm-label">${c.name}</span><span class="vm-num">${c.before ?? 'gone'}</span><span class="vm-arrow">→</span><span class="vm-num">${c.after ?? 'gone'}</span></div>`)
+      .map(c => `<div class="val-metric"><span class="vm-label">${escapeHtml(c.name)}</span><span class="vm-num">${c.before ?? 'gone'}</span><span class="vm-arrow">→</span><span class="vm-num">${c.after ?? 'gone'}</span></div>`)
       .join('');
     return `<div class="val-card">
-      <div class="val-head"><span class="val-tag">INLINE_CANDIDATE · ${d.function}</span><span class="verdict validated">Live result</span></div>
-      <div class="val-action">Force-inlined <code>${d.function}</code> with real <code>-always-inline</code> + cleanup.</div>
+      <div class="val-head"><span class="val-tag">INLINE_CANDIDATE · ${fn}</span><span class="verdict validated">Live result</span></div>
+      <div class="val-action">Force-inlined <code>${fn}</code> with real <code>-always-inline</code> + cleanup.</div>
       ${valMetric('module cost — raw inline only', d.before_total, d.after_raw_total)}
       ${valMetric('module cost — inline + cleanup', d.before_total, d.after_cleaned_total)}
-      <div class="val-note">${d.remaining_calls} remaining call site(s) to ${d.function}.</div>
+      <div class="val-note">${d.remaining_calls} remaining call site(s) to ${fn}.</div>
       ${changed}${compareNote}
     </div>`;
   }
   if (d.tag === 'VECTORIZABLE') {
     const verdictCls = d.verdict === 'vectorized' ? 'validated' : 'limitation';
     return `<div class="val-card">
-      <div class="val-head"><span class="val-tag">VECTORIZABLE · ${d.function}</span><span class="verdict ${verdictCls}">Live result</span></div>
-      <div class="val-action">Ran real <code>-loop-vectorize</code> on <code>${d.function}</code>.</div>
+      <div class="val-head"><span class="val-tag">VECTORIZABLE? · ${fn}</span><span class="verdict ${verdictCls}">Live result</span></div>
+      <div class="val-action">Ran real <code>-loop-vectorize</code> on <code>${fn}</code> (heuristic tag — opt may decline).</div>
       <div class="val-metric"><span class="vm-label">vector instructions</span><span class="vm-num">${d.vector_instructions}</span>
         <span class="vm-delta ${d.verdict === 'vectorized' ? 'down' : 'flat'}">${d.verdict === 'vectorized' ? 'VECTORIZED' : 'declined by real vectorizer'}</span></div>
       ${valMetric('cost', d.before_cost, d.after_cost)}
@@ -2198,18 +2401,18 @@ function renderLiveResultCard(d) {
   }
   if (d.tag === 'RECURSIVE') {
     return `<div class="val-card">
-      <div class="val-head"><span class="val-tag">RECURSIVE · ${d.function}</span><span class="verdict limitation">Live result</span></div>
-      <div class="val-action">Ran real <code>-tailcallelim</code> on <code>${d.function}</code>.</div>
+      <div class="val-head"><span class="val-tag">RECURSIVE · ${fn}</span><span class="verdict limitation">Live result</span></div>
+      <div class="val-action">Ran real <code>-tailcallelim</code> on <code>${fn}</code>.</div>
       <div class="val-metric"><span class="vm-label">self-calls</span><span class="vm-num">${d.before_calls}</span><span class="vm-arrow">→</span><span class="vm-num">${d.after_calls}</span>
-        <span class="vm-delta flat">${d.verdict}</span></div>
+        <span class="vm-delta flat">${escapeHtml(d.verdict || '')}</span></div>
       ${compareNote}
     </div>`;
   }
   if (d.tag === 'HOTSPOT') {
     return `<div class="val-card">
-      <div class="val-head"><span class="val-tag">HOTSPOT · ${d.function}</span><span class="verdict ${d.resolved ? 'validated' : 'partial'}">Live result</span></div>
-      <div class="val-action">Compared ${d.function} at ${d.this_level} vs ${d.other_level}.</div>
-      <div class="val-metric"><span class="vm-label">${d.this_level} → ${d.other_level} cost</span><span class="vm-num">${d.this_cost}</span><span class="vm-arrow">→</span><span class="vm-num">${d.other_cost}</span></div>
+      <div class="val-head"><span class="val-tag">HOTSPOT · ${fn}</span><span class="verdict ${d.resolved ? 'validated' : 'partial'}">Live result</span></div>
+      <div class="val-action">Compared ${fn} at ${escapeHtml(d.this_level)} vs ${escapeHtml(d.other_level)}.</div>
+      <div class="val-metric"><span class="vm-label">${escapeHtml(d.this_level)} → ${escapeHtml(d.other_level)} cost</span><span class="vm-num">${d.this_cost}</span><span class="vm-arrow">→</span><span class="vm-num">${escapeHtml(String(d.other_cost))}</span></div>
       <div class="val-note">${d.resolved ? 'Resolved by the other optimization level alone.' : 'Still HOTSPOT at the other level.'}</div>
       ${compareNote}
     </div>`;
@@ -2355,7 +2558,7 @@ const DEMO_A = {
     "version": "2.0",
     "runLabel": "O0",
     "module": "ir/test_floatmm.O0.ll",
-    "timestamp": "2026-07-14T02:39:43Z",
+    "timestamp": "2026-07-14T03:14:24Z",
     "hotThreshold": 30,
     "inlineThreshold": 20,
     "weights": {
@@ -2961,7 +3164,7 @@ const DEMO_B = {
     "version": "2.0",
     "runLabel": "O2",
     "module": "ir/test_floatmm.O2.ll",
-    "timestamp": "2026-07-14T02:39:43Z",
+    "timestamp": "2026-07-14T03:14:24Z",
     "hotThreshold": 30,
     "inlineThreshold": 20,
     "weights": {
@@ -3586,7 +3789,8 @@ const VALIDATION_DATA = {
 };
 /* VALIDATION_DATA_END */
 
-// Start empty — user picks demo / JSON / live program. No auto-preload.
+// Start empty — no auto-preload. History lives in this browser.
+renderHistoryList();
 initServerMode();
 </script>
 </body>

@@ -1,0 +1,49 @@
+name: Smoke test
+
+# Build Plumb against LLVM 14, analyse the testcases, assert JSON shape.
+# Catches classifier / threshold / JSON regressions that Pages deploy misses.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LLVM 14 + toolchain
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            llvm-14 llvm-14-dev clang-14 cmake python3
+
+      - name: Build pass
+        run: |
+          export LLVM_DIR=/usr/lib/llvm-14/lib/cmake/llvm
+          ./build.sh
+
+      - name: Analyse testcases
+        run: |
+          export LLVM_DIR=/usr/lib/llvm-14/lib/cmake/llvm
+          ./run.sh --no-open
+
+      - name: Assert JSON reports
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          paths = sorted(glob.glob("results/*.json"))
+          assert len(paths) >= 12, f"expected ≥12 reports, got {len(paths)}"
+          for p in paths:
+              j = json.load(open(p))
+              assert "metadata" in j and "functions" in j, p
+              assert "weights" in j["metadata"], p
+              assert j["metadata"].get("hotThreshold") == 30, (p, j["metadata"].get("hotThreshold"))
+              for f in j["functions"]:
+                  assert "groups" in f and "basicBlocks" in f and "recommendations" in f, (p, f.get("name"))
+                  assert isinstance(f["totalCost"], (int, float))
+          print(f"OK — {len(paths)} reports validated")
+          PY

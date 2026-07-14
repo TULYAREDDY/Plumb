@@ -20,7 +20,7 @@ if(LLVM_VERSION_MAJOR GREATER_EQUAL 17)
     "Install LLVM 14 and point CMake at it:\n"
     "  brew install llvm@14   # macOS\n"
     "  export LLVM_DIR=$(brew --prefix llvm@14)/lib/cmake/llvm\n"
-    "  rm -rf build && ./demo.sh")
+    "  rm -rf build && ./build.sh")
 endif()
 
 # ── Build flags ──────────────────────────────────────────────
